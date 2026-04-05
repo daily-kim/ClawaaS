@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -20,9 +21,7 @@ class Settings(BaseSettings):
     gateway_base_url: str = Field(default="http://127.0.0.1:18800")
     cors_allow_origins: list[str] = Field(default_factory=lambda: ["*"])
 
-    class Config:
-        env_prefix = "CLAWAAS_"
-        case_sensitive = False
+    model_config = {"env_prefix": "CLAWAAS_", "case_sensitive": False}
 
 
 @lru_cache(maxsize=1)
