@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Purpose: Stop a per-user OpenClaw gateway managed by the systemd template unit.
-# TODO: Add graceful drain handling and post-stop validation that the port is no longer listening.
+# Purpose: Stop a per-user OpenClaw gateway and verify it is no longer running.
 
 if [[ $# -ne 1 ]]; then
   echo "Usage: $0 <linux-user>" >&2
@@ -10,5 +9,14 @@ if [[ $# -ne 1 ]]; then
 fi
 
 linux_user="$1"
-echo "Stopping gateway for ${linux_user} using unit openclaw-gateway@${linux_user}.service"
-systemctl stop "openclaw-gateway@${linux_user}.service"
+unit="openclaw-gateway@${linux_user}.service"
+
+echo "Stopping gateway for ${linux_user} (unit: ${unit})"
+systemctl stop "${unit}"
+
+if systemctl is-active --quiet "${unit}" 2>/dev/null; then
+  echo "Warning: gateway still active after stop" >&2
+  exit 1
+fi
+
+echo "Gateway for ${linux_user} stopped."

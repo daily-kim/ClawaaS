@@ -1,16 +1,50 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Purpose: Install OpenClaw, OpenShell, Docker, and related host prerequisites on Ubuntu 24.04.
-# TODO: Replace echo placeholders with pinned installation steps and version verification for each dependency.
+# Purpose: Install OpenClaw, OpenShell, Docker, uv, and host prerequisites on Ubuntu 24.04.
+# Run as root.
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "This installer must run as root." >&2
   exit 1
 fi
 
-echo "[TODO] Update apt package lists."
-echo "[TODO] Install Docker Engine and enable the service."
-echo "[TODO] Install OpenClaw binaries or package artifacts."
-echo "[TODO] Install OpenShell runtime dependencies."
-echo "[TODO] Validate that Ubuntu 24.04 host prerequisites are satisfied."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "=== [1/5] System packages ==="
+apt-get update -qq
+apt-get install -y -qq curl jq sudo
+
+echo "=== [2/5] Docker ==="
+if command -v docker &>/dev/null; then
+  echo "Docker already installed: $(docker --version)"
+else
+  apt-get install -y -qq docker.io
+  systemctl enable --now docker
+fi
+
+echo "=== [3/5] uv + Python ==="
+# Install uv for the provisioner user (runs as non-root later)
+if ! command -v uv &>/dev/null; then
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH="/root/.local/bin:$PATH"
+fi
+echo "uv: $(uv --version)"
+echo "Python: $(python3 --version)"
+
+echo "=== [4/5] OpenClaw CLI (cmdok) ==="
+if command -v cmdok &>/dev/null; then
+  echo "cmdok already installed: $(cmdok --version 2>&1 || echo 'installed')"
+else
+  curl -fsSL cmdop.com/install-cli.sh | bash -s -- --prefix=/usr/local/bin
+fi
+
+echo "=== [5/5] OpenShell CLI ==="
+if command -v openshell &>/dev/null; then
+  echo "openshell already installed: $(openshell --version 2>&1 || echo 'installed')"
+else
+  OPENSHELL_INSTALL_DIR=/usr/local/bin curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+fi
+
+echo ""
+echo "=== Installation complete. Run verify_host.sh to confirm. ==="

@@ -1,28 +1,64 @@
-<!--
-Purpose: Describe the runtime bootstrap turn sequence from agent creation through the READY confirmation.
-TODO: Update this flow with concrete request and response payloads once the API and gateway contract is finalized.
--->
-
 # Bootstrap Flow
 
 ## Sequence
 
-1. The application creates an `Agent` record for a signed-in user.
-2. The backend resolves the mapped Linux runtime user for that app user.
-3. The backend ensures per-user config exists and starts the `openclaw-gateway@<linux-user>` systemd unit if needed.
-4. The backend sends the first bootstrap message to the user-specific OpenClaw gateway.
-5. OpenClaw uses the OpenShell backend in remote mode and creates the sandbox on the next agent turn.
-6. The bootstrap script polls for a successful response and checks for the `READY` marker.
-7. The backend marks the runtime instance as ready for normal chat turns.
+```
+[App Backend]                    [systemd]              [OpenClaw Gateway]        [OpenShell]
+     |                               |                         |                      |
+     |-- POST /agents -------------->|                         |                      |
+     |   (create agent row,          |                         |                      |
+     |    status=PROVISIONING)       |                         |                      |
+     |                               |                         |                      |
+     |-- systemctl start ----------->|                         |                      |
+     |   openclaw-gateway@user       |--- start cmdok -------->|                      |
+     |                               |   (reads openclaw.json) |                      |
+     |                               |                         |                      |
+     |-- POST /agents/{id}/bootstrap |                         |                      |
+     |   (bootstrap message) --------|------------------------>|                      |
+     |                               |                         |-- agent turn ------->|
+     |                               |                         |   (first turn)       |
+     |                               |                         |                      |
+     |                               |                         |<- sandbox created ---|
+     |                               |                         |   (openshell sandbox |
+     |                               |                         |    create + ssh-config)
+     |                               |                         |                      |
+     |<-- response with READY -------|--------------------------|                      |
+     |   (status -> READY)           |                         |                      |
+```
 
-## Notes
+## Key Points
 
-- Sandbox creation happens on the first agent turn, not when config is rendered.
-- Per-user isolation depends on unique Linux user, unique home, unique config, unique gateway process, and unique sandbox state.
-- A bootstrap failure should leave enough logs to distinguish config, process, auth, and sandbox errors.
+1. **Sandbox is created on the first agent turn**, not when config is rendered or gateway starts.
+   OpenClaw's OpenShell backend calls `openshell sandbox create` and `openshell sandbox ssh-config` during the first turn.
 
-## Open Questions
+2. **Remote mode**: after initial creation, the remote workspace becomes canonical.
+   The app backend must not modify workspace contents directly — use bootstrap turns only.
 
-- What exact bootstrap prompt should define the workspace and tool expectations?
-- Which gateway health endpoint or log signal should be treated as authoritative before the first turn?
-- How long should the control plane wait before classifying bootstrap as failed?
+3. **State transitions**: `CREATED -> PROVISIONING -> READY -> ERROR`
+   - CREATED: agent row exists in DB
+   - PROVISIONING: gateway started, bootstrap turn sent
+   - READY: bootstrap response received with READY marker
+   - ERROR: any failure in the above sequence
+
+## Gateway Health Check
+
+Before sending the bootstrap turn, verify the gateway is reachable:
+```bash
+curl -sf http://127.0.0.1:<port>/health
+```
+
+## Bootstrap Message
+
+Default: `"Initialize your workspace and reply READY when complete."`
+
+The agent should set up its workspace and confirm readiness. The READY marker in the response is what transitions the agent status.
+
+## Failure Modes
+
+| Failure | Symptom | Action |
+|---------|---------|--------|
+| Config invalid | Gateway won't start | Check `journalctl -u openclaw-gateway@user` |
+| Gateway unreachable | Health check timeout | Check systemd status and port |
+| Bootstrap timeout | No response in 120s | Check LLM API connectivity |
+| No READY in response | Bootstrap returns but no READY | Check LLM prompt / model config |
+| Sandbox creation fails | OpenShell error in gateway logs | Check Docker + OpenShell installation |

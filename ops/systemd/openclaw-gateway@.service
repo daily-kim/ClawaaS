@@ -1,5 +1,5 @@
-# Purpose: systemd template unit for running one isolated OpenClaw gateway per Linux user.
-# TODO: Replace placeholder ExecStart values with the exact OpenClaw gateway invocation and config path.
+# Per-user OpenClaw gateway systemd template unit.
+# Enable with: systemctl enable openclaw-gateway@<linux-user>.service
 
 [Unit]
 Description=ClawaaS OpenClaw gateway for %i
@@ -9,13 +9,24 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=%i
+Group=%i
 WorkingDirectory=/home/%i
 Environment=HOME=/home/%i
 Environment=OPENCLAW_HOME=/home/%i/.openclaw
-Environment=CLAWAAS_GATEWAY_PORT=TODO_DERIVED_PORT
-ExecStart=/usr/bin/env bash -lc 'echo "[TODO] start openclaw gateway for %i in /home/%i"; sleep infinity'
+
+# cmdok reads config from $OPENCLAW_HOME/openclaw.json
+# Port is baked into the per-user config by render_openclaw_config.py
+ExecStart=/usr/local/bin/cmdok gateway start --config /home/%i/.openclaw/openclaw.json
 Restart=on-failure
 RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=15
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=false
+ReadWritePaths=/home/%i
 
 [Install]
 WantedBy=multi-user.target

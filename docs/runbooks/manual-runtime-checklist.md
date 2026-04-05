@@ -1,35 +1,75 @@
-<!--
-Purpose: Step-by-step checklist for manually verifying that a single ClawaaS user can provision and use an isolated runtime.
-TODO: Replace placeholders with the exact operator commands and expected outputs once the runtime scripts are wired together.
--->
-
 # Manual Runtime Checklist
 
 ## Goal
 
-Verify that one application user can receive a dedicated Linux user, dedicated OpenClaw gateway, dedicated sandbox bootstrap flow, and a `READY` signal without sharing state with any other user.
+Verify that one user can get a dedicated Linux user, OpenClaw gateway, OpenShell sandbox, and a READY signal — all isolated.
 
-## Checklist
+## Prerequisites
 
-1. Confirm the host is Ubuntu 24.04 and Docker, OpenClaw, OpenShell, and systemd are available.
-2. Run [`ops/runtime/verify_host.sh`](/home/de1030/workspace/ClawaaS/ops/runtime/verify_host.sh) and record any missing prerequisite.
-3. Generate or choose a test runtime user identifier and create the Linux user with [`ops/runtime/create_linux_user.sh`](/home/de1030/workspace/ClawaaS/ops/runtime/create_linux_user.sh).
-4. Render the per-user OpenClaw configuration with [`ops/runtime/render_openclaw_config.py`](/home/de1030/workspace/ClawaaS/ops/runtime/render_openclaw_config.py).
-5. Start the gateway with [`ops/runtime/start_gateway.sh`](/home/de1030/workspace/ClawaaS/ops/runtime/start_gateway.sh).
-6. Confirm the per-user gateway process is active under the expected Linux account.
-7. Send the bootstrap turn with [`ops/runtime/bootstrap_agent.sh`](/home/de1030/workspace/ClawaaS/ops/runtime/bootstrap_agent.sh).
-8. Verify the bootstrap flow results in sandbox creation and a `READY` response.
-9. Confirm the user home, `.openclaw` state, workspace path, and gateway port are isolated to the created Linux user.
-10. Stop the gateway and clean up any temporary test artifacts.
+Run `ops/runtime/install_runtime.sh` as root, then `ops/runtime/verify_host.sh` to confirm:
+- `docker`, `cmdok`, `openshell`, `python3`, `uv`, `systemctl`, `curl`, `jq` all available
+- Docker service running
+
+## Step-by-step
+
+```bash
+# 0. Set test UUID
+export TEST_UUID="11111111-1111-1111-1111-111111111111"
+
+# 1. Create Linux user
+sudo ops/runtime/create_linux_user.sh "$TEST_UUID"
+# Expected: creates oc_u_11111111111111111111111111111111
+
+export LINUX_USER="oc_u_11111111111111111111111111111111"
+
+# 2. Render per-user OpenClaw config
+python3 ops/runtime/render_openclaw_config.py "$LINUX_USER" \
+  "/home/$LINUX_USER/.openclaw/openclaw.json" \
+  --llm-api-url=http://YOUR_LLM_API:PORT/v1
+# Expected: config written to /home/<user>/.openclaw/openclaw.json
+
+# 3. Fix ownership (config was written as current user)
+sudo chown -R "$LINUX_USER:$LINUX_USER" "/home/$LINUX_USER/.openclaw"
+
+# 4. Install systemd unit (one-time)
+sudo cp ops/systemd/openclaw-gateway@.service /etc/systemd/system/
+sudo systemctl daemon-reload
+
+# 5. Start gateway
+sudo ops/runtime/start_gateway.sh "$LINUX_USER"
+# Expected: "Gateway for oc_u_... is active."
+
+# 6. Verify gateway process runs as correct user
+ps aux | grep cmdok | grep "$LINUX_USER"
+systemctl status "openclaw-gateway@${LINUX_USER}.service"
+
+# 7. Bootstrap agent
+ops/runtime/bootstrap_agent.sh "$LINUX_USER" "test-agent-001"
+# Expected: "READY — bootstrap successful."
+
+# 8. Verify isolation
+ls -la "/home/$LINUX_USER/"
+ls -la "/home/$LINUX_USER/.openclaw/"
+ls -la "/home/$LINUX_USER/workspace/"
+# All should be owned by $LINUX_USER with 700 permissions
+
+# 9. Cleanup
+sudo ops/runtime/stop_gateway.sh "$LINUX_USER"
+sudo userdel -r "$LINUX_USER"
+```
 
 ## Evidence To Capture
 
-- Linux username used for the test
-- Derived gateway port
-- Config path rendered for the user
-- `systemctl` status output for the gateway unit
-- Bootstrap response showing `READY`
+- [ ] Linux username created
+- [ ] Derived gateway port (check with `jq --arg u "$LINUX_USER" '.[$u]' /var/lib/clawaas/port-registry.json`)
+- [ ] Config path rendered
+- [ ] `systemctl status` output showing User= matches linux user
+- [ ] Bootstrap response containing READY
+- [ ] Home directory permissions = 700, owned by linux user
 
 ## Exit Criteria
 
-The runtime is considered manually verified when the user can bootstrap successfully, the gateway runs as the per-user account, and no shared home/workspace/gateway state is observed.
+The runtime is verified when:
+1. Bootstrap returns READY
+2. Gateway runs as the per-user Linux account
+3. No shared home/workspace/gateway state exists

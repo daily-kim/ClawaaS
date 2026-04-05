@@ -1,0 +1,6 @@
+.codex
+apps/api/logs/
+__pycache__/
+.venv/
+*.pyc
+.python-version
