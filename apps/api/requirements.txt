@@ -1,0 +1,8 @@
+# Purpose: Python dependencies for the ClawaaS FastAPI control plane.
+# TODO: Pin exact versions after the initial runtime and API integration is stable.
+fastapi
+uvicorn
+pydantic
+python-jose
+passlib
+aiosqlite

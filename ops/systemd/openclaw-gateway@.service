@@ -1,0 +1,21 @@
+# Purpose: systemd template unit for running one isolated OpenClaw gateway per Linux user.
+# TODO: Replace placeholder ExecStart values with the exact OpenClaw gateway invocation and config path.
+
+[Unit]
+Description=ClawaaS OpenClaw gateway for %i
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/home/%i
+Environment=HOME=/home/%i
+Environment=OPENCLAW_HOME=/home/%i/.openclaw
+Environment=CLAWAAS_GATEWAY_PORT=TODO_DERIVED_PORT
+ExecStart=/usr/bin/env bash -lc 'echo "[TODO] start openclaw gateway for %i in /home/%i"; sleep infinity'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

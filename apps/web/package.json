@@ -1,0 +1,16 @@
+{
+  "//": "Purpose: Package manifest for the ClawaaS Next.js frontend. TODO: Add scripts, dev dependencies, and stricter tooling once the first UI slice is implemented.",
+  "name": "clawaas-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  }
+}

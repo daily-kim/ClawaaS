@@ -1,0 +1,10 @@
+# Purpose: sudoers policy allowing the app provisioner to create runtime users and control per-user gateway units.
+# TODO: Replace `appuser` with the deployed service account and tighten command paths if installation paths change.
+
+Defaults!CLAWAAS_CMDS !requiretty
+
+Cmnd_Alias CLAWAAS_CMDS = /home/de1030/workspace/ClawaaS/ops/runtime/create_linux_user.sh [0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*, \
+    /bin/systemctl start openclaw-gateway@oc_u_*.service, \
+    /bin/systemctl stop openclaw-gateway@oc_u_*.service
+
+appuser ALL=(root) NOPASSWD: CLAWAAS_CMDS
