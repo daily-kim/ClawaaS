@@ -14,10 +14,13 @@ Output path must be under /home/<linux-user>/ for safety.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
 BASE_GATEWAY_PORT = 18800
+DEFAULT_LLM_API_URL = os.environ.get("CLAWAAS_LLM_API_URL", "")
+DEFAULT_LLM_MODEL = os.environ.get("CLAWAAS_LLM_MODEL", "")
 DEFAULT_PORT_REGISTRY = "/var/lib/clawaas/port-registry.json"
 
 
@@ -45,7 +48,12 @@ def allocate_port(linux_user: str, registry_path: str = DEFAULT_PORT_REGISTRY) -
     return port
 
 
-def render_config(linux_user: str, port: int, llm_api_url: str = "") -> dict:
+def render_config(
+    linux_user: str,
+    port: int,
+    llm_api_url: str = "",
+    llm_model: str = "",
+) -> dict:
     """Build a per-user OpenClaw config matching the official schema.
 
     Schema reference: `openclaw config schema`
@@ -53,6 +61,7 @@ def render_config(linux_user: str, port: int, llm_api_url: str = "") -> dict:
     - agents.defaults.workspace: per-user workspace
     - agents.defaults.sandbox: OpenShell backend in remote mode
     - plugins.entries.openshell: OpenShell plugin config
+    - models.providers.litellm: LiteLLM-compatible LLM endpoint
     """
     home_dir = Path("/home") / linux_user
 
@@ -85,9 +94,27 @@ def render_config(linux_user: str, port: int, llm_api_url: str = "") -> dict:
         },
     }
 
-    if llm_api_url:
-        config["env"] = {
-            "LLM_API_URL": llm_api_url,
+    if llm_api_url and llm_model:
+        config["models"] = {
+            "mode": "replace",
+            "providers": {
+                "litellm": {
+                    "baseUrl": llm_api_url,
+                    "apiKey": {
+                        "source": "env",
+                        "provider": "default",
+                        "id": "LITELLM_API_KEY",
+                    },
+                    "api": "openai-completions",
+                    "auth": "api-key",
+                    "models": [
+                        {
+                            "id": llm_model,
+                            "name": llm_model,
+                        },
+                    ],
+                },
+            },
         }
 
     return config
@@ -103,12 +130,15 @@ def main(argv: list[str]) -> int:
 
     linux_user = argv[1]
     output_path_str = argv[2]
-    llm_api_url = ""
+    llm_api_url = DEFAULT_LLM_API_URL
+    llm_model = DEFAULT_LLM_MODEL
     port_registry = DEFAULT_PORT_REGISTRY
 
     for arg in argv[3:]:
         if arg.startswith("--llm-api-url="):
             llm_api_url = arg.split("=", 1)[1]
+        elif arg.startswith("--llm-model="):
+            llm_model = arg.split("=", 1)[1]
         elif arg.startswith("--port-registry="):
             port_registry = arg.split("=", 1)[1]
 
@@ -120,7 +150,7 @@ def main(argv: list[str]) -> int:
         return 1
 
     port = allocate_port(linux_user, port_registry)
-    config = render_config(linux_user, port, llm_api_url)
+    config = render_config(linux_user, port, llm_api_url, llm_model)
     payload = json.dumps(config, indent=2) + "\n"
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -128,7 +158,11 @@ def main(argv: list[str]) -> int:
 
     # Write gateway.env for systemd EnvironmentFile
     env_path = output_path.parent / "gateway.env"
-    env_path.write_text(f"CLAWAAS_GATEWAY_PORT={port}\n", encoding="utf-8")
+    env_lines = [f"CLAWAAS_GATEWAY_PORT={port}"]
+    # LITELLM_API_KEY must be set by the operator (or via FastAPI provisioner)
+    # Include placeholder so the env file structure is ready
+    env_lines.append("# LITELLM_API_KEY=<set-by-operator>")
+    env_path.write_text("\n".join(env_lines) + "\n", encoding="utf-8")
 
     print(f"Config written to {output_path} (port: {port})")
     print(f"Env file written to {env_path}")

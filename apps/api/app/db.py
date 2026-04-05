@@ -1,8 +1,4 @@
-"""
-Purpose: Provide SQLite connection helpers for the ClawaaS API.
-TODO: Define schema initialization, migrations, and transaction helpers.
-"""
-
+"""SQLite connection helpers and schema initialization for ClawaaS API."""
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -12,10 +8,42 @@ import aiosqlite
 
 from app.config import get_settings
 
+_SCHEMA = """\
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agents (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    linux_user TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'created',
+    port INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+"""
+
 
 def _sqlite_path_from_url(database_url: str) -> str:
-    """Translate a basic sqlite URL into a filesystem path for aiosqlite."""
     return database_url.removeprefix("sqlite+aiosqlite:///")
+
+
+async def init_db() -> None:
+    """Create tables if they don't exist."""
+    async with get_connection() as db:
+        await db.executescript(_SCHEMA)
+        await db.commit()
 
 
 @asynccontextmanager

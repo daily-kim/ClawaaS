@@ -48,7 +48,7 @@ done
 echo "Sending bootstrap message via openclaw agent..."
 response=$(sudo -u "${linux_user}" \
   env HOME="/home/${linux_user}" \
-      OPENCLAW_HOME="/home/${linux_user}/.openclaw" \
+      OPENCLAW_HOME="/home/${linux_user}" \
       TMPDIR="/home/${linux_user}/.openclaw/tmp" \
   openclaw agent \
     --session-id "bootstrap-${linux_user}" \

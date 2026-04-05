@@ -11,20 +11,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import Settings, get_settings
+from app.db import init_db
 from app.routers import agents, auth
 from app.routers.auth import me_router
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Provide a startup and shutdown hook for future resource wiring."""
-    settings: Settings = get_settings()
-    _ = settings
-    try:
-        yield
-    finally:
-        return
+    """Initialize DB on startup."""
+    await init_db()
+    yield
 
 
 def create_app() -> FastAPI:

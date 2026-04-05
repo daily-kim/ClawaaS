@@ -45,6 +45,13 @@ echo "=== [4/6] Install systemd unit ==="
 cp "${PROJECT_ROOT}/ops/systemd/openclaw-gateway@.service" /etc/systemd/system/
 systemctl daemon-reload
 
+# Inject LITELLM_API_KEY into gateway.env if provided
+if [[ -n "${LITELLM_API_KEY:-}" ]]; then
+  echo "LITELLM_API_KEY=${LITELLM_API_KEY}" >> "/home/${LINUX_USER}/.openclaw/gateway.env"
+  chown "${LINUX_USER}:${LINUX_USER}" "/home/${LINUX_USER}/.openclaw/gateway.env"
+  echo "LITELLM_API_KEY injected into gateway.env"
+fi
+
 echo ""
 echo "=== [5/6] Start gateway ==="
 "${PROJECT_ROOT}/ops/runtime/start_gateway.sh" "${LINUX_USER}"

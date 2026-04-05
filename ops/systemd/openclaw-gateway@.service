@@ -12,8 +12,9 @@ User=%i
 Group=%i
 WorkingDirectory=/home/%i
 Environment=HOME=/home/%i
-Environment=OPENCLAW_HOME=/home/%i/.openclaw
+Environment=OPENCLAW_HOME=/home/%i
 Environment=TMPDIR=/home/%i/.openclaw/tmp
+Environment=NODE_OPTIONS=--use-system-ca
 EnvironmentFile=/home/%i/.openclaw/gateway.env
 
 # openclaw reads config from $OPENCLAW_HOME/openclaw.json automatically
@@ -30,6 +31,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=false
 ReadWritePaths=/home/%i /tmp
+ReadOnlyPaths=/etc/ssl /etc/resolv.conf /etc/hosts /usr/share/ca-certificates /opt/openclaw
 
 [Install]
 WantedBy=multi-user.target
