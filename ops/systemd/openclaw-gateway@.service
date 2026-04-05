@@ -14,9 +14,9 @@ WorkingDirectory=/home/%i
 Environment=HOME=/home/%i
 Environment=OPENCLAW_HOME=/home/%i/.openclaw
 
-# cmdok reads config from $OPENCLAW_HOME/openclaw.json
+# openclaw CLI reads config from $OPENCLAW_HOME/openclaw.json
 # Port is baked into the per-user config by render_openclaw_config.py
-ExecStart=/usr/local/bin/cmdok gateway start --config /home/%i/.openclaw/openclaw.json
+ExecStart=/usr/local/bin/openclaw gateway --config /home/%i/.openclaw/openclaw.json
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=30

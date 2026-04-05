@@ -36,11 +36,20 @@ fi
 echo "uv: $(uv --version)"
 echo "Python: $(python3 --version)"
 
-echo "=== [4/5] OpenClaw CLI (cmdok) ==="
-if command -v cmdok &>/dev/null; then
-  echo "cmdok already installed: $(cmdok --version 2>&1 || echo 'installed')"
+echo "=== [4/5] OpenClaw Gateway CLI ==="
+if command -v openclaw &>/dev/null; then
+  echo "openclaw already installed: $(timeout 5 openclaw --version </dev/null 2>&1 | head -1 || echo 'installed')"
 else
-  curl -fsSL cmdop.com/install-cli.sh | bash -s -- --prefix=/usr/local/bin
+  # Requires Node.js 22.14+ or 24+
+  if ! command -v node &>/dev/null; then
+    echo "Error: Node.js is required for OpenClaw. Install Node.js 22.14+ first." >&2
+    exit 1
+  fi
+  curl -fsSL https://openclaw.ai/install.sh | bash
+  # Move to system path if installed to user-local
+  if [[ -f /root/.local/bin/openclaw ]] && [[ ! -f /usr/local/bin/openclaw ]]; then
+    mv /root/.local/bin/openclaw /usr/local/bin/openclaw
+  fi
 fi
 
 echo "=== [5/5] OpenShell CLI ==="

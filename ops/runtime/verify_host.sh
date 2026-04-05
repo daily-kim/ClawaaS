@@ -33,8 +33,9 @@ echo ""
 
 echo "--- Required binaries ---"
 check_cmd docker
-check_cmd cmdok
+check_cmd openclaw
 check_cmd openshell
+check_cmd node
 check_cmd python3
 check_cmd uv
 check_cmd systemctl
