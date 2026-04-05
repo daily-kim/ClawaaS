@@ -18,7 +18,10 @@ if [[ ! "${uuid}" =~ ${uuid_regex} ]]; then
   exit 1
 fi
 
-linux_user="oc_u_${uuid//-/}"
+# Use first 8 hex chars of UUID to stay within Linux 32-char username limit
+# oc_u_ (5) + 8 hex = 13 chars, well within limit
+short_id="${uuid:0:8}"
+linux_user="oc_u_${short_id}"
 home_dir="/home/${linux_user}"
 
 echo "Planned Linux user: ${linux_user}"

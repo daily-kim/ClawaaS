@@ -13,6 +13,7 @@ We need to provide multiple users with isolated OpenClaw environments on a singl
 
 ## Decision
 Map each application user to a dedicated Linux user account.
+Username format: `oc_u_<first-8-hex-of-uuid>` (13 chars, within Linux 32-char limit).
 
 ```
 1 app user -> 1 Linux user -> 1 ~/.openclaw -> 1 workspace -> 1 gateway process -> 1 sandbox

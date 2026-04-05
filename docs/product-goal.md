@@ -21,7 +21,7 @@
 ```
 
 Each user gets:
-- Dedicated Linux account (e.g., oc_u_<uuid>)
+- Dedicated Linux account (e.g., oc_u_11111111 — first 8 hex chars of UUID)
 - Own ~/.openclaw with config, credentials, sessions
 - Own workspace directory
 - Own gateway process on a unique port

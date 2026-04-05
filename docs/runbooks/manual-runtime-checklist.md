@@ -20,7 +20,7 @@ export TEST_UUID="11111111-1111-1111-1111-111111111111"
 sudo ops/runtime/create_linux_user.sh "$TEST_UUID"
 # Expected: creates oc_u_11111111111111111111111111111111
 
-export LINUX_USER="oc_u_11111111111111111111111111111111"
+export LINUX_USER="oc_u_11111111"
 
 # 2. Render per-user OpenClaw config
 python3 ops/runtime/render_openclaw_config.py "$LINUX_USER" \

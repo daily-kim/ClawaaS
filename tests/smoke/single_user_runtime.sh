@@ -6,7 +6,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TEST_UUID="11111111-1111-1111-1111-111111111111"
-LINUX_USER="oc_u_${TEST_UUID//-/}"
+LINUX_USER="oc_u_${TEST_UUID:0:8}"
 AGENT_ID="smoke-test-agent-001"
 PORT_REGISTRY="/var/lib/clawaas/port-registry.json"
 

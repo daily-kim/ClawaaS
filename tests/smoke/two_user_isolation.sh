@@ -9,8 +9,8 @@ PORT_REGISTRY="/var/lib/clawaas/port-registry.json"
 
 UUID_A="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 UUID_B="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-USER_A="oc_u_${UUID_A//-/}"
-USER_B="oc_u_${UUID_B//-/}"
+USER_A="oc_u_${UUID_A:0:8}"
+USER_B="oc_u_${UUID_B:0:8}"
 
 cleanup() {
   echo "=== Cleanup ==="
