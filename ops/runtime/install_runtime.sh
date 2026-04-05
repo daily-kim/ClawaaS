@@ -24,10 +24,14 @@ else
 fi
 
 echo "=== [3/5] uv + Python ==="
-# Install uv for the provisioner user (runs as non-root later)
+# Install uv to /usr/local/bin so it's available to all users including sudo
 if ! command -v uv &>/dev/null; then
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-  export PATH="/root/.local/bin:$PATH"
+  curl -LsSf https://astral.sh/uv/install.sh | env INSTALLER_NO_MODIFY_PATH=1 sh -s -- --no-modify-path
+  # Move from default ~/.local/bin to system path
+  if [[ -f /root/.local/bin/uv ]]; then
+    mv /root/.local/bin/uv /usr/local/bin/uv
+    mv /root/.local/bin/uvx /usr/local/bin/uvx 2>/dev/null || true
+  fi
 fi
 echo "uv: $(uv --version)"
 echo "Python: $(python3 --version)"
