@@ -36,6 +36,8 @@ fi
 echo "uv: $(uv --version)"
 echo "Python: $(python3 --version)"
 
+PACKAGES_DIR="$(cd "${SCRIPT_DIR}/../packages" 2>/dev/null && pwd)" || PACKAGES_DIR=""
+
 echo "=== [4/5] OpenClaw Gateway CLI ==="
 if command -v openclaw &>/dev/null; then
   echo "openclaw already installed: $(timeout 5 openclaw --version </dev/null 2>&1 | head -1 || echo 'installed')"
@@ -45,10 +47,39 @@ else
     echo "Error: Node.js is required for OpenClaw. Install Node.js 22.14+ first." >&2
     exit 1
   fi
-  curl -fsSL https://openclaw.ai/install.sh | bash
-  # Move to system path if installed to user-local
-  if [[ -f /root/.local/bin/openclaw ]] && [[ ! -f /usr/local/bin/openclaw ]]; then
-    mv /root/.local/bin/openclaw /usr/local/bin/openclaw
+
+  # Try local package first (offline/air-gapped), then fallback to internet
+  OPENCLAW_TGZ=$(ls "${PACKAGES_DIR}"/openclaw-*.tgz 2>/dev/null | head -1 || true)
+  if [[ -n "${OPENCLAW_TGZ}" ]]; then
+    echo "Installing OpenClaw from local package: ${OPENCLAW_TGZ}"
+    npm install -g "${OPENCLAW_TGZ}"
+  else
+    echo "No local package found, installing from internet..."
+    curl -fsSL https://openclaw.ai/install.sh | bash
+    # Move to system path if installed to user-local
+    if [[ -f /root/.local/bin/openclaw ]] && [[ ! -f /usr/local/bin/openclaw ]]; then
+      mv /root/.local/bin/openclaw /usr/local/bin/openclaw
+    fi
+  fi
+
+  # Set up /opt/openclaw for multi-user access
+  NODE_BIN="$(which node)"
+  OPENCLAW_PKG="$(npm root -g)/openclaw"
+  if [[ -d "${OPENCLAW_PKG}" ]]; then
+    mkdir -p /opt/openclaw
+    cp -a "${OPENCLAW_PKG}" /opt/openclaw/pkg
+    cp "${NODE_BIN}" /opt/openclaw/node
+
+    tee /usr/local/bin/openclaw > /dev/null << 'WRAPPER'
+#!/bin/sh
+exec /opt/openclaw/node /opt/openclaw/pkg/openclaw.mjs "$@"
+WRAPPER
+    chmod +x /usr/local/bin/openclaw
+  fi
+
+  # Ensure node is in system path
+  if [[ ! -f /usr/local/bin/node ]]; then
+    cp "${NODE_BIN}" /usr/local/bin/node
   fi
 fi
 
@@ -56,7 +87,16 @@ echo "=== [5/5] OpenShell CLI ==="
 if command -v openshell &>/dev/null; then
   echo "openshell already installed: $(openshell --version 2>&1 || echo 'installed')"
 else
-  OPENSHELL_INSTALL_DIR=/usr/local/bin curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+  # Try local tarball first (offline/air-gapped), then fallback to internet
+  OPENSHELL_TGZ=$(ls "${PACKAGES_DIR}"/openshell-*.tar.gz 2>/dev/null | head -1 || true)
+  if [[ -n "${OPENSHELL_TGZ}" ]]; then
+    echo "Installing OpenShell from local package: ${OPENSHELL_TGZ}"
+    tar xzf "${OPENSHELL_TGZ}" -C /usr/local/bin/
+    chmod +x /usr/local/bin/openshell
+  else
+    echo "No local package found, installing from internet..."
+    OPENSHELL_INSTALL_DIR=/usr/local/bin curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+  fi
 fi
 
 echo ""

@@ -43,14 +43,41 @@ sudo cp ~/.local/bin/uvx /usr/local/bin/uvx
 
 ## 5단계: OpenClaw CLI
 
+### 방법 A: 레포 내 로컬 패키지 사용 (폐쇄망 권장)
+
+레포의 `ops/packages/` 디렉토리에 npm tarball이 포함되어 있습니다.
+
 ```bash
-# 설치 (Node.js 필요)
+# npm global install (Node.js 필요)
+sudo npm install -g ~/workspace/ClawaaS/ops/packages/openclaw-*.tgz
+
+# 시스템 전역 설치 — /opt에 복사 + wrapper 방식
+NODE_BIN="$(which node)"
+OPENCLAW_PKG="$(npm root -g)/openclaw"
+
+sudo mkdir -p /opt/openclaw
+sudo cp -a "${OPENCLAW_PKG}" /opt/openclaw/pkg
+sudo cp "${NODE_BIN}" /opt/openclaw/node
+
+sudo tee /usr/local/bin/openclaw > /dev/null << 'WRAPPER'
+#!/bin/sh
+exec /opt/openclaw/node /opt/openclaw/pkg/openclaw.mjs "$@"
+WRAPPER
+sudo chmod +x /usr/local/bin/openclaw
+
+# node도 시스템 경로에
+sudo cp "${NODE_BIN}" /usr/local/bin/node
+
+# 확인
+sudo openclaw --version
+```
+
+### 방법 B: 인터넷에서 직접 설치
+
+```bash
 curl -fsSL https://openclaw.ai/install.sh | bash
 
-# 시스템 전역 설치 — 심볼릭 링크가 아닌 wrapper 방식
-# (다른 Linux 유저가 접근해야 하므로 /opt에 복사)
 NVM_NODE_DIR="$HOME/.nvm/versions/node/$(node --version)"
-
 sudo mkdir -p /opt/openclaw
 sudo cp -a "${NVM_NODE_DIR}/lib/node_modules/openclaw" /opt/openclaw/pkg
 sudo cp "${NVM_NODE_DIR}/bin/node" /opt/openclaw/node
@@ -60,23 +87,29 @@ sudo tee /usr/local/bin/openclaw > /dev/null << 'WRAPPER'
 exec /opt/openclaw/node /opt/openclaw/pkg/openclaw.mjs "$@"
 WRAPPER
 sudo chmod +x /usr/local/bin/openclaw
-
-# node도 시스템 경로에
 sudo cp "${NVM_NODE_DIR}/bin/node" /usr/local/bin/node
 
-# 확인
 sudo openclaw --version
 ```
 
 ## 6단계: OpenShell CLI
 
-```bash
-curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+### 방법 A: 레포 내 로컬 패키지 사용 (폐쇄망 권장)
 
-# 시스템 전역으로 복사
-sudo cp ~/.local/bin/openshell /usr/local/bin/openshell
+```bash
+sudo tar xzf ~/workspace/ClawaaS/ops/packages/openshell-*.tar.gz -C /usr/local/bin/
+sudo chmod +x /usr/local/bin/openshell
 
 # 확인
+sudo openshell --version
+```
+
+### 방법 B: 인터넷에서 직접 설치
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+sudo cp ~/.local/bin/openshell /usr/local/bin/openshell
+
 sudo openshell --version
 ```
 
@@ -149,22 +182,23 @@ source ~/.bashrc && nvm install 24
 curl -LsSf https://astral.sh/uv/install.sh | sh
 sudo cp ~/.local/bin/uv ~/.local/bin/uvx /usr/local/bin/
 
-# === OpenClaw ===
-curl -fsSL https://openclaw.ai/install.sh | bash
-NVM_NODE_DIR="$HOME/.nvm/versions/node/$(node --version)"
+# === OpenClaw (로컬 패키지) ===
+sudo npm install -g ~/workspace/ClawaaS/ops/packages/openclaw-*.tgz
+NODE_BIN="$(which node)"
+OPENCLAW_PKG="$(npm root -g)/openclaw"
 sudo mkdir -p /opt/openclaw
-sudo cp -a "${NVM_NODE_DIR}/lib/node_modules/openclaw" /opt/openclaw/pkg
-sudo cp "${NVM_NODE_DIR}/bin/node" /opt/openclaw/node
+sudo cp -a "${OPENCLAW_PKG}" /opt/openclaw/pkg
+sudo cp "${NODE_BIN}" /opt/openclaw/node
 sudo tee /usr/local/bin/openclaw > /dev/null << 'WRAPPER'
 #!/bin/sh
 exec /opt/openclaw/node /opt/openclaw/pkg/openclaw.mjs "$@"
 WRAPPER
 sudo chmod +x /usr/local/bin/openclaw
-sudo cp "${NVM_NODE_DIR}/bin/node" /usr/local/bin/node
+sudo cp "${NODE_BIN}" /usr/local/bin/node
 
-# === OpenShell ===
-curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
-sudo cp ~/.local/bin/openshell /usr/local/bin/openshell
+# === OpenShell (로컬 패키지) ===
+sudo tar xzf ~/workspace/ClawaaS/ops/packages/openshell-*.tar.gz -C /usr/local/bin/
+sudo chmod +x /usr/local/bin/openshell
 
 # === 프로젝트 설정 ===
 cd ~/workspace/ClawaaS
