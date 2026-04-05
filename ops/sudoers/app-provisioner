@@ -1,10 +1,19 @@
 # Purpose: sudoers policy allowing the app provisioner to create runtime users and control per-user gateway units.
-# TODO: Replace `appuser` with the deployed service account and tighten command paths if installation paths change.
+# Before installing, replace:
+#   - __APPUSER__  → actual service account (e.g. clawaas)
+#   - __PROJECT__  → absolute path to ClawaaS repo (e.g. /opt/ClawaaS)
 
 Defaults!CLAWAAS_CMDS !requiretty
 
-Cmnd_Alias CLAWAAS_CMDS = /home/de1030/workspace/ClawaaS/ops/runtime/create_linux_user.sh [0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*, \
+Cmnd_Alias CLAWAAS_CMDS = __PROJECT__/ops/runtime/create_linux_user.sh [0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*, \
+    /usr/bin/python3 __PROJECT__/ops/runtime/render_openclaw_config.py *, \
+    __PROJECT__/ops/runtime/start_gateway.sh oc_u_*, \
+    __PROJECT__/ops/runtime/stop_gateway.sh oc_u_*, \
+    __PROJECT__/ops/runtime/bootstrap_agent.sh oc_u_*, \
+    /usr/bin/chown -R oc_u_*\:oc_u_* /home/oc_u_*/.openclaw, \
+    /usr/bin/cat /home/oc_u_*/.openclaw/gateway.env, \
     /bin/systemctl start openclaw-gateway@oc_u_*.service, \
-    /bin/systemctl stop openclaw-gateway@oc_u_*.service
+    /bin/systemctl stop openclaw-gateway@oc_u_*.service, \
+    /bin/systemctl restart openclaw-gateway@oc_u_*.service
 
-appuser ALL=(root) NOPASSWD: CLAWAAS_CMDS
+__APPUSER__ ALL=(root) NOPASSWD: CLAWAAS_CMDS

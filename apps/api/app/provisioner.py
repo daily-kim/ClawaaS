@@ -9,7 +9,11 @@ from app.config import get_settings
 
 
 def _project_root() -> Path:
-    return Path(get_settings().project_root)
+    configured = get_settings().project_root
+    if configured:
+        return Path(configured)
+    # Auto-detect: apps/api/app/provisioner.py → ClawaaS/
+    return Path(__file__).resolve().parent.parent.parent.parent
 
 
 async def _run_command(command: str) -> str:

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="development")
     database_url: str = Field(default="sqlite+aiosqlite:///./clawaas.db")
     jwt_secret: str = Field(default="change-me")
-    project_root: str = Field(default="/home/de1030/workspace/ClawaaS")
+    project_root: str = Field(default="")
     gateway_base_url: str = Field(default="http://127.0.0.1:18800")
     cors_allow_origins: list[str] = Field(default_factory=lambda: ["*"])
 
