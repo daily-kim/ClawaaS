@@ -4,6 +4,7 @@
 - Ubuntu 24.04 (또는 호환 Linux)
 - root 또는 sudo 권한
 - Docker 설치됨 (또는 설치 가능)
+- Node.js 22.14+ 및 npm 설치됨
 - 인터넷 접근 가능 (설치 시에만, 이후 폐쇄망 OK)
 
 ## 1단계: 시스템 패키지
@@ -23,12 +24,12 @@ sudo systemctl enable --now docker
 ## 3단계: Node.js (OpenClaw 필수)
 
 ```bash
-# nvm 설치
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-source ~/.bashrc
+# 시스템 패키지 매니저 또는 NodeSource 등으로 설치
+sudo apt-get install -y nodejs npm
 
-# Node.js 24 설치
-nvm install 24
+# 확인 (22.14+ 필요)
+node --version
+npm --version
 ```
 
 ## 4단계: uv (Python 패키지 매니저)
@@ -48,7 +49,7 @@ sudo cp ~/.local/bin/uvx /usr/local/bin/uvx
 레포의 `ops/packages/` 디렉토리에 npm tarball이 포함되어 있습니다.
 
 ```bash
-# npm global install (Node.js 필요)
+# npm global install
 sudo npm install -g ~/workspace/ClawaaS/ops/packages/openclaw-*.tgz
 
 # 시스템 전역 설치 — /opt에 복사 + wrapper 방식
@@ -65,8 +66,8 @@ exec /opt/openclaw/node /opt/openclaw/pkg/openclaw.mjs "$@"
 WRAPPER
 sudo chmod +x /usr/local/bin/openclaw
 
-# node도 시스템 경로에
-sudo cp "${NODE_BIN}" /usr/local/bin/node
+# node도 시스템 경로에 (없을 경우)
+sudo cp "${NODE_BIN}" /usr/local/bin/node 2>/dev/null || true
 
 # 확인
 sudo openclaw --version
@@ -76,20 +77,7 @@ sudo openclaw --version
 
 ```bash
 curl -fsSL https://openclaw.ai/install.sh | bash
-
-NVM_NODE_DIR="$HOME/.nvm/versions/node/$(node --version)"
-sudo mkdir -p /opt/openclaw
-sudo cp -a "${NVM_NODE_DIR}/lib/node_modules/openclaw" /opt/openclaw/pkg
-sudo cp "${NVM_NODE_DIR}/bin/node" /opt/openclaw/node
-
-sudo tee /usr/local/bin/openclaw > /dev/null << 'WRAPPER'
-#!/bin/sh
-exec /opt/openclaw/node /opt/openclaw/pkg/openclaw.mjs "$@"
-WRAPPER
-sudo chmod +x /usr/local/bin/openclaw
-sudo cp "${NVM_NODE_DIR}/bin/node" /usr/local/bin/node
-
-sudo openclaw --version
+# 이후 /opt/openclaw + wrapper 설정은 방법 A와 동일
 ```
 
 ## 6단계: OpenShell CLI
@@ -140,29 +128,20 @@ sudo chmod 440 /etc/sudoers.d/app-provisioner
 # 주의: app-provisioner 파일의 "appuser"를 실제 서비스 계정으로 수정
 ```
 
-## 10단계: 수동 테스트
+## 10단계: 테스트
+
+상세 절차는 [testing-guide.md](testing-guide.md) 참조.
 
 ```bash
-# 단일 유저 smoke test
-sudo bash tests/smoke/single_user_runtime.sh
-
-# 두 유저 격리 테스트
+# 빠른 검증
+sudo bash ops/runtime/verify_host.sh
 sudo bash tests/smoke/two_user_isolation.sh
-```
 
-## 11단계: LLM API 설정 (bootstrap READY를 받으려면)
-
-OpenClaw는 기본으로 Anthropic API를 호출합니다. 내부 LLM API를 사용하려면
-per-user 설정이 필요합니다:
-
-```bash
-# 방법 1: openclaw configure로 interactive 설정
-sudo -u <linux-user> env HOME=/home/<linux-user> \
-  OPENCLAW_HOME=/home/<linux-user>/.openclaw \
-  openclaw configure
-
-# 방법 2: auth-profiles.json 직접 생성
-# (정확한 형식은 openclaw 문서 참조)
+# LLM 연동 포함 전체 테스트
+sudo CLAWAAS_LLM_API_URL="https://your-llm-endpoint" \
+     CLAWAAS_LLM_MODEL="your-model-name" \
+     LITELLM_API_KEY="sk-xxx" \
+     bash tests/smoke/single_user_runtime.sh
 ```
 
 ---
@@ -171,12 +150,8 @@ sudo -u <linux-user> env HOME=/home/<linux-user> \
 
 ```bash
 # === 패키지 ===
-sudo apt-get update && sudo apt-get install -y curl jq sudo docker.io
+sudo apt-get update && sudo apt-get install -y curl jq sudo docker.io nodejs npm
 sudo systemctl enable --now docker
-
-# === Node.js ===
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-source ~/.bashrc && nvm install 24
 
 # === uv ===
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -194,7 +169,7 @@ sudo tee /usr/local/bin/openclaw > /dev/null << 'WRAPPER'
 exec /opt/openclaw/node /opt/openclaw/pkg/openclaw.mjs "$@"
 WRAPPER
 sudo chmod +x /usr/local/bin/openclaw
-sudo cp "${NODE_BIN}" /usr/local/bin/node
+sudo cp "${NODE_BIN}" /usr/local/bin/node 2>/dev/null || true
 
 # === OpenShell (로컬 패키지) ===
 sudo tar xzf ~/workspace/ClawaaS/ops/packages/openshell-*.tar.gz -C /usr/local/bin/
@@ -207,5 +182,9 @@ sudo cp ops/systemd/openclaw-gateway@.service /etc/systemd/system/
 sudo systemctl daemon-reload
 
 # === 테스트 ===
-sudo bash tests/smoke/single_user_runtime.sh
+sudo bash tests/smoke/two_user_isolation.sh
+sudo CLAWAAS_LLM_API_URL="https://your-llm-endpoint" \
+     CLAWAAS_LLM_MODEL="your-model-name" \
+     LITELLM_API_KEY="sk-xxx" \
+     bash tests/smoke/single_user_runtime.sh
 ```
