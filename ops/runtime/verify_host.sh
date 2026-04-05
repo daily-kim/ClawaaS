@@ -8,7 +8,10 @@ errors=0
 check_cmd() {
   local cmd="$1"
   if command -v "${cmd}" &>/dev/null; then
-    echo "[OK]   ${cmd}: $(${cmd} --version 2>&1 | head -1)"
+    # Use timeout and close stdin to prevent interactive prompts from hanging
+    local ver
+    ver="$(timeout 5 "${cmd}" --version </dev/null 2>&1 | head -1)" || ver="installed"
+    echo "[OK]   ${cmd}: ${ver}"
   else
     echo "[FAIL] ${cmd}: not found"
     errors=$((errors + 1))
