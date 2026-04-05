@@ -125,7 +125,13 @@ def main(argv: list[str]) -> int:
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(payload, encoding="utf-8")
+
+    # Write gateway.env for systemd EnvironmentFile
+    env_path = output_path.parent / "gateway.env"
+    env_path.write_text(f"CLAWAAS_GATEWAY_PORT={port}\n", encoding="utf-8")
+
     print(f"Config written to {output_path} (port: {port})")
+    print(f"Env file written to {env_path}")
 
     return 0
 

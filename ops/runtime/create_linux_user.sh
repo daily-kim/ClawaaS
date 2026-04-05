@@ -33,6 +33,11 @@ fi
 
 useradd --create-home --home-dir "${home_dir}" --shell /bin/bash "${linux_user}"
 install -d -m 700 -o "${linux_user}" -g "${linux_user}" "${home_dir}/.openclaw"
+install -d -m 700 -o "${linux_user}" -g "${linux_user}" "${home_dir}/.openclaw/tmp"
 install -d -m 700 -o "${linux_user}" -g "${linux_user}" "${home_dir}/workspace"
+
+# Create /tmp/openclaw-<uid> owned by this user (OpenClaw temp dir requirement)
+user_uid="$(id -u "${linux_user}")"
+install -d -m 700 -o "${linux_user}" -g "${linux_user}" "/tmp/openclaw-${user_uid}"
 
 echo "Created ${linux_user} with isolated home ${home_dir}"

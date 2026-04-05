@@ -13,10 +13,13 @@ Group=%i
 WorkingDirectory=/home/%i
 Environment=HOME=/home/%i
 Environment=OPENCLAW_HOME=/home/%i/.openclaw
+Environment=TMPDIR=/home/%i/.openclaw/tmp
+EnvironmentFile=/home/%i/.openclaw/gateway.env
 
-# openclaw CLI reads config from $OPENCLAW_HOME/openclaw.json
-# Port is baked into the per-user config by render_openclaw_config.py
-ExecStart=/usr/local/bin/openclaw gateway --config /home/%i/.openclaw/openclaw.json
+# openclaw reads config from $OPENCLAW_HOME/openclaw.json automatically
+# Port from gateway.env; --allow-unconfigured skips gateway.mode=local requirement
+ExecStartPre=/bin/mkdir -p /home/%i/.openclaw/tmp
+ExecStart=/usr/local/bin/openclaw gateway run --allow-unconfigured --port ${CLAWAAS_GATEWAY_PORT}
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=30
@@ -26,7 +29,7 @@ TimeoutStopSec=15
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=false
-ReadWritePaths=/home/%i
+ReadWritePaths=/home/%i /tmp
 
 [Install]
 WantedBy=multi-user.target
