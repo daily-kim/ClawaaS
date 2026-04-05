@@ -1,6 +1,10 @@
 .codex
 apps/api/logs/
+apps/api/clawaas.db
 __pycache__/
 .venv/
 *.pyc
 .python-version
+node_modules/
+.next/
+next-env.d.ts
