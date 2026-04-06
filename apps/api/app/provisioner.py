@@ -123,11 +123,14 @@ async def inject_container_certs(linux_user: str) -> None:
         pass  # Non-fatal: sandbox may still work without extra certs
 
 
-async def bootstrap_agent(linux_user: str) -> str:
+async def bootstrap_agent(linux_user: str, bootstrap_message: str | None = None) -> str:
     """Run the bootstrap script for a Linux user."""
     script_path = _project_root() / "ops/runtime/bootstrap_agent.sh"
+    command = f"sudo bash {shlex.quote(str(script_path))} {shlex.quote(linux_user)}"
+    if bootstrap_message:
+        command += f" {shlex.quote(bootstrap_message)}"
     return await _run_command(
-        f"sudo bash {shlex.quote(str(script_path))} {shlex.quote(linux_user)}"
+        command
     )
 
 
@@ -291,3 +294,77 @@ async def run_agent_turn(linux_user: str, session_id: str, message: str) -> str:
             ]
         )
     )
+
+
+async def stream_agent_turn(
+    linux_user: str,
+    session_id: str,
+    message: str,
+) -> AsyncIterator[dict[str, object]]:
+    """Stream one agent turn as line-oriented stdout/stderr events."""
+    home = f"/home/{linux_user}"
+    process = await asyncio.create_subprocess_exec(
+        "sudo",
+        "-u",
+        linux_user,
+        "env",
+        f"HOME={home}",
+        f"OPENCLAW_HOME={home}",
+        f"TMPDIR={home}/.openclaw/tmp",
+        "openclaw",
+        "agent",
+        "--session-id",
+        session_id,
+        "--message",
+        message,
+        "--json",
+        "--timeout",
+        "120",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+    captured_stdout: list[str] = []
+    captured_stderr: list[str] = []
+
+    async def _pump(
+        stream: asyncio.StreamReader | None,
+        source: str,
+        sink: list[str],
+    ) -> None:
+        if stream is None:
+            await queue.put({"type": "eof", "source": source})
+            return
+        while True:
+            line = await stream.readline()
+            if not line:
+                break
+            text = line.decode(errors="replace").rstrip()
+            sink.append(text)
+            await queue.put({"type": "line", "source": source, "line": text})
+        await queue.put({"type": "eof", "source": source})
+
+    tasks = [
+        asyncio.create_task(_pump(process.stdout, "stdout", captured_stdout)),
+        asyncio.create_task(_pump(process.stderr, "stderr", captured_stderr)),
+    ]
+
+    open_streams = len(tasks)
+    while open_streams > 0:
+        item = await queue.get()
+        if item["type"] == "eof":
+            open_streams -= 1
+            continue
+        yield item
+
+    await asyncio.gather(*tasks)
+    returncode = await process.wait()
+    combined_stdout = "\n".join(captured_stdout).strip()
+    combined_stderr = "\n".join(captured_stderr).strip()
+    yield {
+        "type": "exit",
+        "returncode": returncode,
+        "stdout": combined_stdout,
+        "stderr": combined_stderr,
+    }

@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS agents (
     name TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'created',
     port INTEGER,
+    bootstrap_text TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 """
@@ -43,6 +44,12 @@ async def init_db() -> None:
     """Create tables if they don't exist."""
     async with get_connection() as db:
         await db.executescript(_SCHEMA)
+        columns = {
+            row[1]
+            for row in await (await db.execute("PRAGMA table_info(agents)")).fetchall()
+        }
+        if "bootstrap_text" not in columns:
+            await db.execute("ALTER TABLE agents ADD COLUMN bootstrap_text TEXT")
         await db.commit()
 
 

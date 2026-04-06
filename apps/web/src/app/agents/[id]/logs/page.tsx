@@ -16,6 +16,70 @@ type LogLine = {
   level: "info" | "warn" | "error" | "system";
 };
 
+function extractJsonObject(raw: string): Record<string, unknown> | null {
+  const start = raw.indexOf("{");
+  if (start < 0) return null;
+  try {
+    const parsed = JSON.parse(raw.slice(start));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function summarizeLogText(text: string): string | null {
+  const compact = text.trim();
+  if (!compact || compact === "READY") return null;
+
+  if (compact.startsWith("Response:")) {
+    const parsed = extractJsonObject(compact);
+    const result = parsed?.result;
+    if (result && typeof result === "object" && !Array.isArray(result)) {
+      const payloads = (result as Record<string, unknown>).payloads;
+      if (Array.isArray(payloads)) {
+        const texts = payloads
+          .filter((payload): payload is Record<string, unknown> => !!payload && typeof payload === "object")
+          .map((payload) => (typeof payload.text === "string" ? payload.text.trim() : ""))
+          .filter(Boolean);
+        if (texts.length > 0) {
+          const chars = texts.join("\n").length;
+          return `LLM response received (${chars} chars)`;
+        }
+      }
+      const statusText = ["summary", "status", "message", "detail"]
+        .map((key) => (typeof (result as Record<string, unknown>)[key] === "string" ? String((result as Record<string, unknown>)[key]).trim() : ""))
+        .find(Boolean);
+      if (statusText) return `LLM status: ${statusText}`;
+    }
+    return "LLM response received";
+  }
+
+  const parsed = extractJsonObject(compact);
+  if (parsed) {
+    const result = parsed.result;
+    if (result && typeof result === "object" && !Array.isArray(result)) {
+      const payloads = (result as Record<string, unknown>).payloads;
+      if (Array.isArray(payloads) && payloads.length > 0) return "LLM response chunk received";
+    }
+    const statusText = ["summary", "status", "message", "detail"]
+      .map((key) => (typeof parsed[key] === "string" ? String(parsed[key]).trim() : ""))
+      .find(Boolean);
+    if (statusText) return `LLM status: ${statusText}`;
+    return "LLM event received";
+  }
+
+  if (/tool|function call|running command|exec/i.test(compact)) return "Tool activity reported";
+  if (/Sending bootstrap message via openclaw agent/i.test(compact)) return "Bootstrap turn started";
+  if (/Bootstrapping .* via gateway on port/i.test(compact)) return compact.replace(/^Bootstrapping\s+/, "Bootstrapping ");
+  if (/Waiting for gateway to be reachable/i.test(compact)) return "Waiting for gateway";
+  if (/Gateway reachable/i.test(compact)) return "Gateway reachable";
+  if (/Bootstrap response captured/i.test(compact)) return "Bootstrap response stored";
+
+  return compact;
+}
+
 /** Strip journald prefix and extract the meaningful part of each log line. */
 function parseLine(raw: string): LogLine {
   // journald format: "2026-04-06T11:49:15+09:00 HOSTNAME process[PID]: <message>"
@@ -41,6 +105,7 @@ function parseLine(raw: string): LogLine {
     time = "";
     text = raw;
   }
+  text = summarizeLogText(text) || "";
 
   // Determine log level
   let level: LogLine["level"] = "info";
@@ -121,12 +186,23 @@ export default function AgentLogsPage() {
 
           const newLines: LogLine[] = [];
           for (const part of parts) {
-            if (part.startsWith("data: ")) {
-              newLines.push(parseLine(part.slice(6)));
-            }
+            if (!part.startsWith("data: ")) continue;
+            const parsed = parseLine(part.slice(6));
+            if (!parsed.text) continue;
+            const previous = newLines[newLines.length - 1];
+            if (previous && previous.text === parsed.text && previous.level === parsed.level) continue;
+            newLines.push(parsed);
           }
           if (newLines.length > 0) {
-            setLines((prev) => [...prev, ...newLines]);
+            setLines((prev) => {
+              const merged = [...prev];
+              for (const line of newLines) {
+                const previous = merged[merged.length - 1];
+                if (previous && previous.text === line.text && previous.level === line.level) continue;
+                merged.push(line);
+              }
+              return merged;
+            });
           }
         }
       } catch (err) {

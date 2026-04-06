@@ -8,11 +8,15 @@ type Agent = {
   id: string;
   name: string;
   status: string;
+  bootstrap_text?: string | null;
 };
 
 type Message = {
-  role: "user" | "agent";
+  id: string;
+  role: "user" | "agent" | "activity";
   text: string;
+  items?: string[];
+  state?: "streaming" | "done" | "error";
 };
 
 type LogLine = {
@@ -20,6 +24,70 @@ type LogLine = {
   text: string;
   level: "info" | "warn" | "error" | "system";
 };
+
+function extractJsonObject(raw: string): Record<string, unknown> | null {
+  const start = raw.indexOf("{");
+  if (start < 0) return null;
+  try {
+    const parsed = JSON.parse(raw.slice(start));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function summarizeLogText(text: string): string | null {
+  const compact = text.trim();
+  if (!compact || compact === "READY") return null;
+
+  if (compact.startsWith("Response:")) {
+    const parsed = extractJsonObject(compact);
+    const result = parsed?.result;
+    if (result && typeof result === "object" && !Array.isArray(result)) {
+      const payloads = (result as Record<string, unknown>).payloads;
+      if (Array.isArray(payloads)) {
+        const texts = payloads
+          .filter((payload): payload is Record<string, unknown> => !!payload && typeof payload === "object")
+          .map((payload) => (typeof payload.text === "string" ? payload.text.trim() : ""))
+          .filter(Boolean);
+        if (texts.length > 0) {
+          const chars = texts.join("\n").length;
+          return `LLM response received (${chars} chars)`;
+        }
+      }
+      const statusText = ["summary", "status", "message", "detail"]
+        .map((key) => (typeof (result as Record<string, unknown>)[key] === "string" ? String((result as Record<string, unknown>)[key]).trim() : ""))
+        .find(Boolean);
+      if (statusText) return `LLM status: ${statusText}`;
+    }
+    return "LLM response received";
+  }
+
+  const parsed = extractJsonObject(compact);
+  if (parsed) {
+    const result = parsed.result;
+    if (result && typeof result === "object" && !Array.isArray(result)) {
+      const payloads = (result as Record<string, unknown>).payloads;
+      if (Array.isArray(payloads) && payloads.length > 0) return "LLM response chunk received";
+    }
+    const statusText = ["summary", "status", "message", "detail"]
+      .map((key) => (typeof parsed[key] === "string" ? String(parsed[key]).trim() : ""))
+      .find(Boolean);
+    if (statusText) return `LLM status: ${statusText}`;
+    return "LLM event received";
+  }
+
+  if (/tool|function call|running command|exec/i.test(compact)) return "Tool activity reported";
+  if (/Sending bootstrap message via openclaw agent/i.test(compact)) return "Bootstrap turn started";
+  if (/Bootstrapping .* via gateway on port/i.test(compact)) return compact.replace(/^Bootstrapping\s+/, "Bootstrapping ");
+  if (/Waiting for gateway to be reachable/i.test(compact)) return "Waiting for gateway";
+  if (/Gateway reachable/i.test(compact)) return "Gateway reachable";
+  if (/Bootstrap response captured/i.test(compact)) return "Bootstrap response stored";
+
+  return compact;
+}
 
 function parseLine(raw: string): LogLine {
   const journalMatch = raw.match(
@@ -38,6 +106,7 @@ function parseLine(raw: string): LogLine {
     time = "";
     text = raw;
   }
+  text = summarizeLogText(text) || "";
   let level: LogLine["level"] = "info";
   if (source === "systemd") level = "system";
   else if (/error|failed|fatal/i.test(text)) level = "error";
@@ -61,6 +130,48 @@ type FileEntry = {
 
 type Tab = "chat" | "logs" | "files";
 
+type ChatStreamUpdate = {
+  kind: "message" | "tool" | "status";
+  text: string;
+};
+
+type ChatStreamDone = {
+  text?: string;
+  summary?: string;
+  had_reply?: boolean;
+  exit_code?: number;
+};
+
+function makeId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function normalizeMessages(raw: unknown): Message[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const item = entry as Partial<Message>;
+    if ((item.role !== "user" && item.role !== "agent" && item.role !== "activity") || typeof item.text !== "string") {
+      return [];
+    }
+    return [{
+      id: typeof item.id === "string" ? item.id : makeId(),
+      role: item.role,
+      text: item.text,
+      items: Array.isArray(item.items) ? item.items.filter((value): value is string => typeof value === "string") : undefined,
+      state: item.state === "streaming" || item.state === "done" || item.state === "error" ? item.state : undefined,
+    }];
+  });
+}
+
+function appendUnique(items: string[], text: string) {
+  if (!text.trim() || items.includes(text)) return items;
+  return [...items, text];
+}
+
 export default function AgentPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -71,8 +182,10 @@ export default function AgentPage() {
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window === "undefined") return [];
     try {
-      return JSON.parse(localStorage.getItem(`chat:${id}`) || "[]");
-    } catch { return []; }
+      return normalizeMessages(JSON.parse(localStorage.getItem(`chat:${id}`) || "[]"));
+    } catch {
+      return [];
+    }
   });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -156,9 +269,24 @@ export default function AgentPage() {
           buffer = parts.pop() || "";
           const newLines: LogLine[] = [];
           for (const part of parts) {
-            if (part.startsWith("data: ")) newLines.push(parseLine(part.slice(6)));
+            if (!part.startsWith("data: ")) continue;
+            const parsed = parseLine(part.slice(6));
+            if (!parsed.text) continue;
+            const previous = newLines[newLines.length - 1];
+            if (previous && previous.text === parsed.text && previous.level === parsed.level) continue;
+            newLines.push(parsed);
           }
-          if (newLines.length > 0) setLines((prev) => [...prev, ...newLines]);
+          if (newLines.length > 0) {
+            setLines((prev) => {
+              const merged = [...prev];
+              for (const line of newLines) {
+                const previous = merged[merged.length - 1];
+                if (previous && previous.text === line.text && previous.level === line.level) continue;
+                merged.push(line);
+              }
+              return merged;
+            });
+          }
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -234,6 +362,20 @@ export default function AgentPage() {
     }
   }, [lines, pinBottom]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!agent || agent.status !== "ready") return;
+    if (messages.length > 0) return;
+    if (!agent.bootstrap_text?.trim()) return;
+
+    const welcome = {
+      id: makeId(),
+      role: "agent" as const,
+      text: agent.bootstrap_text,
+    };
+    setMessages([welcome]);
+  }, [agent, messages.length]);
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -241,37 +383,138 @@ export default function AgentPage() {
     const message = (form.get("message") as string).trim();
     if (!message) return;
 
-    setMessages((prev) => [...prev, { role: "user", text: message }]);
+    const userMessage: Message = { id: makeId(), role: "user", text: message };
+    const activityId = makeId();
+    setMessages((prev) => [
+      ...prev,
+      userMessage,
+      {
+        id: activityId,
+        role: "activity",
+        text: "Agent is working...",
+        items: [],
+        state: "streaming",
+      },
+    ]);
     e.currentTarget.reset();
     setSending(true);
 
     try {
-      const data = await api<{ response: string; text?: string }>(`/agents/${id}/chat`, {
-        method: "POST",
-        body: JSON.stringify({ message }),
-      });
+      const token = getToken();
+      const res = await fetch(
+        `http://${window.location.hostname}:8000/agents/${id}/chat/stream`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ message }),
+        }
+      );
 
-      let text: string;
-      if (data.text && data.text.trim()) {
-        text = data.text;
-      } else {
-        try {
-          const inner = JSON.parse(data.response);
-          const payloads = inner?.result?.payloads;
-          if (Array.isArray(payloads) && payloads.length > 0) {
-            text = payloads.map((p: { text: string }) => p.text).join("\n");
+      if (!res.ok || !res.body) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `${res.status} ${res.statusText}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalText = "";
+      let finalSummary = "";
+      let activityItems: string[] = [];
+
+      const updateActivity = (text: string, state: Message["state"] = "streaming") => {
+        setMessages((prev) => prev.map((msg) => {
+          if (msg.id !== activityId || msg.role !== "activity") return msg;
+          return { ...msg, text, items: activityItems, state };
+        }));
+      };
+
+      const handleSsePart = (part: string) => {
+        const lines = part.split("\n");
+        let event = "message";
+        let data = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) event = line.slice(7).trim();
+          if (line.startsWith("data: ")) data += line.slice(6);
+        }
+        if (!data) return;
+
+        if (event === "update") {
+          const parsed = JSON.parse(data) as ChatStreamUpdate;
+          if (parsed.kind === "message") {
+            finalText = parsed.text.trim();
           } else {
-            const summary = inner?.summary || inner?.status || "No response";
-            text = `[${summary}]`;
+            activityItems = appendUnique(activityItems, parsed.text.trim());
+            finalSummary = parsed.text.trim() || finalSummary;
+            updateActivity(parsed.text.trim(), "streaming");
           }
-        } catch {
-          text = data.response;
+          return;
+        }
+
+        if (event === "done") {
+          const parsed = JSON.parse(data) as ChatStreamDone;
+          finalText = parsed.text?.trim() || finalText;
+          finalSummary = parsed.summary?.trim() || finalSummary;
+          return;
+        }
+
+        if (event === "error") {
+          const parsed = JSON.parse(data) as { detail?: string };
+          const detail = parsed.detail?.trim() || "Chat failed";
+          activityItems = appendUnique(activityItems, detail);
+          updateActivity(detail, "error");
+          throw new Error(detail);
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+
+        for (const part of parts) {
+          handleSsePart(part);
         }
       }
 
-      setMessages((prev) => [...prev, { role: "agent", text }]);
+      if (buffer.trim()) handleSsePart(buffer);
+
+      setMessages((prev) => {
+        const shouldKeepActivity = activityItems.length > 0 || !finalText;
+        const next = shouldKeepActivity
+          ? prev.map((msg) => {
+              if (msg.id !== activityId || msg.role !== "activity") return msg;
+              return {
+                ...msg,
+                text: finalSummary || msg.text || "No reply from agent.",
+                items: activityItems,
+                state: "done",
+              };
+            })
+          : prev.filter((msg) => msg.id !== activityId);
+
+        next.push({
+          id: makeId(),
+          role: "agent",
+          text: finalText || finalSummary || "No reply from agent.",
+        });
+        return next;
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Chat failed");
+      setMessages((prev) => prev.map((msg) => {
+        if (msg.id !== activityId || msg.role !== "activity") return msg;
+        return {
+          ...msg,
+          text: msg.text || "Chat failed",
+          state: "error",
+        };
+      }));
     } finally {
       setSending(false);
     }
@@ -352,11 +595,25 @@ export default function AgentPage() {
           {error && <p className="error">{error}</p>}
 
           <div className="chat-messages">
-            {messages.map((msg, i) => (
-              <div key={i} className={`msg msg-${msg.role}`}>
-                <strong>{msg.role === "user" ? "You" : "Agent"}</strong>
-                <p style={{ whiteSpace: "pre-wrap" }}>{msg.text}</p>
-              </div>
+            {messages.map((msg) => (
+              msg.role === "activity" ? (
+                <details key={msg.id} className={`msg msg-activity msg-activity-${msg.state || "done"}`}>
+                  <summary>
+                    <strong>Agent Updates</strong>
+                    <span>{msg.state === "streaming" ? "Updating..." : msg.text}</span>
+                  </summary>
+                  <div className="msg-activity-body">
+                    {(msg.items && msg.items.length > 0 ? msg.items : [msg.text]).map((item, itemIndex) => (
+                      <p key={`${msg.id}-${itemIndex}`} style={{ whiteSpace: "pre-wrap" }}>{item}</p>
+                    ))}
+                  </div>
+                </details>
+              ) : (
+                <div key={msg.id} className={`msg msg-${msg.role}`}>
+                  <strong>{msg.role === "user" ? "You" : "Agent"}</strong>
+                  <p style={{ whiteSpace: "pre-wrap" }}>{msg.text}</p>
+                </div>
+              )
             ))}
             <div ref={bottomRef} />
           </div>

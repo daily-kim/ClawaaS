@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Purpose: Send the bootstrap turn to a user's gateway and verify READY response.
+# Purpose: Send the bootstrap turn to a user's gateway and capture the initial onboarding reply.
 # Uses `openclaw agent` CLI which communicates via WebSocket to the gateway.
 
 if [[ $# -lt 1 ]]; then
@@ -10,7 +10,17 @@ if [[ $# -lt 1 ]]; then
 fi
 
 linux_user="$1"
-bootstrap_message="${2:-Initialize your workspace and reply READY when complete.}"
+bootstrap_message="${2:-작업 공간 초기화를 마친 뒤, 다른 질문이나 설명 없이 아래 한국어 문구만 그대로 답하세요.
+
+안녕하세요. 저는 이 에이전트입니다.
+
+런타임과 작업 공간 준비를 마쳤고, 지금부터 바로 함께 작업할 수 있습니다.
+
+원하시면 코드 수정, 파일 탐색, 로그 확인, 문제 분석처럼 구체적인 요청부터 시작해도 좋고,
+
+아직 방향을 정하는 중이라면 목표나 상황을 설명해 주셔도 됩니다.
+
+무엇을 먼저 진행할지 알려주세요.}"
 
 # Derive port from the port registry
 PORT_REGISTRY="${PORT_REGISTRY:-/var/lib/clawaas/port-registry.json}"
@@ -63,11 +73,5 @@ response=$(sudo -u "${linux_user}" \
 
 echo "Response: ${response}"
 
-# Check for READY in response
-if echo "${response}" | grep -qi "READY"; then
-  echo "READY — bootstrap successful."
-  exit 0
-else
-  echo "Error: READY not found in bootstrap response." >&2
-  exit 2
-fi
+echo "Bootstrap response captured."
+exit 0
