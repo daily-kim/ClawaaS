@@ -266,19 +266,43 @@ export default function AgentPage() {
     }
   }
 
-  if (!agent) return <p>Loading...</p>;
+  if (!agent) return <p className="loading-state">Loading agent workspace...</p>;
 
   return (
-    <section>
-      <div className="nav">
-        <h1>{agent.name || "Agent"}</h1>
-        <div className="link-row">
+    <section className="agent-shell">
+      <div className="topbar">
+        <div className="topbar-copy">
+          <span className="eyebrow">Agent Workspace</span>
+          <h1>{agent.name || "Agent"}</h1>
+          <p className="muted">Inspect runtime state, then use chat, logs, or files as needed.</p>
+        </div>
+        <div className="topbar-actions">
           <span className={`status status-${agent.status}`}>{agent.status}</span>
-          <a href="/dashboard">Dashboard</a>
+          <a className="text-link" href="/dashboard">Back to dashboard</a>
         </div>
       </div>
 
-      <div className="tab-bar">
+      <div className="stats-strip">
+        <div className="stat-tile">
+          <span>Status</span>
+          <strong>{agent.status}</strong>
+        </div>
+        <div className="stat-tile">
+          <span>Chat messages</span>
+          <strong>{messages.length}</strong>
+        </div>
+        <div className="stat-tile">
+          <span>Log lines</span>
+          <strong>{lines.length}</strong>
+        </div>
+        <div className="stat-tile">
+          <span>Current path</span>
+          <strong>{filePath === "." ? "/" : filePath}</strong>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="tab-bar">
         <button
           className={`tab ${tab === "chat" ? "tab-active" : ""}`}
           onClick={() => setTab("chat")}
@@ -297,13 +321,21 @@ export default function AgentPage() {
         >
           Files
         </button>
+        </div>
       </div>
 
       {tab === "chat" && (
-        <>
+        <div className="card">
+          <div className="panel-header">
+            <div className="card-title">
+              <h3>Conversation</h3>
+              <p className="muted">Use chat when you want agent output, not as the only control surface.</p>
+            </div>
+          </div>
+
           {agent.status === "bootstrapping" && (
-            <div className="card" style={{ textAlign: "center", background: "#fef9c3" }}>
-              Agent is bootstrapping...
+            <div className="notice">
+              Agent is bootstrapping. Chat will unlock when the runtime reports ready.
             </div>
           )}
 
@@ -326,32 +358,40 @@ export default function AgentPage() {
               placeholder={agent.status === "ready" ? "Type a message..." : "Waiting for agent..."}
               disabled={agent.status !== "ready" || sending}
             />
-            <button type="submit" disabled={agent.status !== "ready" || sending}>
-              {sending ? "..." : "Send"}
-            </button>
+            <div className="chat-actions">
+              <button type="submit" disabled={agent.status !== "ready" || sending}>
+                {sending ? "Sending..." : "Send"}
+              </button>
+            </div>
           </form>
-        </>
+        </div>
       )}
 
       {tab === "logs" && (
-        <>
-          <div style={{ marginBottom: "0.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+        <div className="card">
+          <div className="panel-header">
+            <div className="card-title">
+              <h3>Runtime logs</h3>
+              <p className="muted">Inspect stream output from the sandbox process.</p>
+            </div>
+            <span className="pill">
               {streaming ? "\u25cf Streaming" : "\u25cb Disconnected"} &middot; {lines.length} lines
             </span>
-            <label style={{ fontSize: "0.85rem", cursor: "pointer" }}>
+          </div>
+          <div className="panel-header" style={{ marginBottom: "0.75rem" }}>
+            <label className="muted" style={{ cursor: "pointer" }}>
               <input
                 type="checkbox"
                 checked={pinBottom}
                 onChange={(e) => setPinBottom(e.target.checked)}
-                style={{ width: "auto", display: "inline", margin: "0 0.25rem 0 0" }}
+                style={{ width: "auto", display: "inline", margin: "0 0.35rem 0 0" }}
               />
               Auto-scroll
             </label>
           </div>
           <div ref={termRef} className="terminal">
             {lines.length === 0 ? (
-              <div style={{ color: "#6b7280" }}>Waiting for log data...</div>
+              <div style={{ color: "#8a816f" }}>Waiting for log data...</div>
             ) : (
               lines.map((line, i) => (
                 <div key={i} className="log-line" style={{ color: LEVEL_COLORS[line.level] }}>
@@ -365,11 +405,18 @@ export default function AgentPage() {
               ))
             )}
           </div>
-        </>
+        </div>
       )}
 
       {tab === "files" && (
-        <>
+        <div className="card">
+          <div className="panel-header">
+            <div className="card-title">
+              <h3>Sandbox files</h3>
+              <p className="muted">Browse directories and edit individual files in place.</p>
+            </div>
+          </div>
+
           <div className="file-toolbar">
             <button className="file-nav-btn" onClick={navigateUp} disabled={filePath === "."}>
               ..
@@ -428,7 +475,7 @@ export default function AgentPage() {
               />
             </div>
           )}
-        </>
+        </div>
       )}
     </section>
   );

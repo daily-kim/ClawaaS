@@ -25,6 +25,9 @@ export default function DashboardPage() {
   const [showForm, setShowForm] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const readyCount = agents.filter((agent) => agent.status === "ready").length;
+  const bootingCount = agents.filter((agent) => agent.status === "bootstrapping").length;
+  const issueCount = agents.filter((agent) => agent.status === "error").length;
 
   useEffect(() => {
     Promise.all([
@@ -81,15 +84,21 @@ export default function DashboardPage() {
     router.push("/login");
   }
 
-  if (!user) return <p>Loading...</p>;
+  if (!user) return <p className="loading-state">Loading dashboard...</p>;
 
   return (
-    <section>
-      <div className="nav">
-        <h1>Dashboard</h1>
-        <div className="link-row">
-          <span>{user.email}</span>
-          <button onClick={logout} style={{ background: "#6b7280" }}>
+    <section className="dashboard-shell">
+      <div className="topbar">
+        <div className="topbar-copy">
+          <span className="eyebrow">Agent Dashboard</span>
+          <h1>Sandbox overview</h1>
+          <p className="muted">
+            Lightweight control surface for the ClawaaS demo.
+          </p>
+        </div>
+        <div className="topbar-actions">
+          <span className="pill">{user.email}</span>
+          <button className="button-secondary" onClick={logout}>
             Logout
           </button>
         </div>
@@ -97,61 +106,120 @@ export default function DashboardPage() {
 
       {error && <p className="error">{error}</p>}
 
-      {agents.map((agent) => (
-        <div className="card" key={agent.id}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div>
-              <strong>{agent.name || "Agent"}</strong>
-              <span className={`status status-${agent.status}`} style={{ marginLeft: "0.5rem" }}>
-                {agent.status}
-              </span>
+      <div className="stats-strip">
+        <div className="stat-tile">
+          <span>Total agents</span>
+          <strong>{agents.length}</strong>
+        </div>
+        <div className="stat-tile">
+          <span>Ready</span>
+          <strong>{readyCount}</strong>
+        </div>
+        <div className="stat-tile">
+          <span>Bootstrapping</span>
+          <strong>{bootingCount}</strong>
+        </div>
+        <div className="stat-tile">
+          <span>Issues</span>
+          <strong>{issueCount}</strong>
+        </div>
+      </div>
+
+      <div className="section-grid">
+        <div className="section-stack">
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">
+                <h3>Active agents</h3>
+                <p className="muted">
+                  {agents.length === 0
+                    ? "No agents are running yet."
+                    : `${agents.length} sandbox${agents.length === 1 ? "" : "es"} currently tracked.`}
+                </p>
+              </div>
+              <span className="pill">Status, port, and runtime access</span>
             </div>
-            <div className="link-row">
-              <a href={`/agents/${agent.id}`}>
-                <button>Open</button>
-              </a>
+
+            {agents.length === 0 ? (
+              <div className="empty-state">
+                Create your first agent to start a clean sandbox for experiments, debugging, or autonomous runs.
+              </div>
+            ) : (
+              <div className="agent-grid">
+                {agents.map((agent) => (
+                  <div className="agent-row" key={agent.id}>
+                    <div className="agent-main">
+                      <div className="agent-name-row">
+                        <h3>{agent.name || "Agent"}</h3>
+                        <span className={`status status-${agent.status}`}>{agent.status}</span>
+                      </div>
+                      <div className="agent-meta-grid">
+                        <span className="meta-label">Linux user</span>
+                        <span>{agent.linux_user}</span>
+                        <span className="meta-label">Port</span>
+                        <span>{agent.port ?? "pending"}</span>
+                      </div>
+                    </div>
+                    <div className="agent-actions">
+                      <a href={`/agents/${agent.id}`}>
+                        <button>Open</button>
+                      </a>
+                      <button
+                        className="button-danger"
+                        onClick={() => deleteAgent(agent.id)}
+                        disabled={deletingId === agent.id}
+                      >
+                        {deletingId === agent.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <aside className="card create-panel">
+          <div className="card-title" style={{ marginBottom: "1rem" }}>
+            <h3>New sandbox</h3>
+            <p className="muted">Create a disposable runtime for demos, tests, or debugging.</p>
+          </div>
+
+          {showForm ? (
+            <form onSubmit={createAgent} className="auth-form">
+              <div className="field">
+                <label htmlFor="name">Agent name</label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder="Research Runner"
+                  autoFocus
+                />
+              </div>
+              <button className="button-wide" type="submit" disabled={creating}>
+                {creating ? "Creating..." : "Create agent"}
+              </button>
               <button
-                onClick={() => deleteAgent(agent.id)}
-                disabled={deletingId === agent.id}
-                style={{ background: "#dc2626" }}
+                className="button-secondary button-wide"
+                type="button"
+                onClick={() => setShowForm(false)}
               >
-                {deletingId === agent.id ? "..." : "Delete"}
+                Cancel
+              </button>
+            </form>
+          ) : (
+            <div className="section-stack">
+              <div className="notice">
+                This demo keeps agent lifecycle simple: create, inspect, delete.
+              </div>
+              <button className="button-wide" onClick={() => setShowForm(true)}>
+                Create new agent
               </button>
             </div>
-          </div>
-          <p style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: "0.25rem" }}>
-            {agent.linux_user} &middot; port {agent.port ?? "—"}
-          </p>
-        </div>
-      ))}
-
-      {showForm ? (
-        <form onSubmit={createAgent} className="card" style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <input
-            name="name"
-            type="text"
-            placeholder="Agent name"
-            autoFocus
-            style={{ flex: 1, padding: "0.4rem 0.6rem", borderRadius: "6px", border: "1px solid #d1d5db" }}
-          />
-          <button type="submit" disabled={creating}>
-            {creating ? "Creating..." : "Create"}
-          </button>
-          <button type="button" onClick={() => setShowForm(false)} style={{ background: "#6b7280" }}>
-            Cancel
-          </button>
-        </form>
-      ) : (
-        <button onClick={() => setShowForm(true)} style={{ marginTop: "0.5rem" }}>
-          + New Agent
-        </button>
-      )}
+          )}
+        </aside>
+      </div>
     </section>
   );
 }
