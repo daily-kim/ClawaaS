@@ -90,10 +90,10 @@ export default function DashboardPage() {
     <section className="dashboard-shell">
       <div className="topbar">
         <div className="topbar-copy">
-          <span className="eyebrow">Agent Dashboard</span>
-          <h1>Sandbox overview</h1>
+          <span className="eyebrow">OpenClaw Control</span>
+          <h1>DS-Claw 🦞 Agent Console</h1>
           <p className="muted">
-            Lightweight control surface for the ClawaaS demo.
+            Create your own personal, private, managed OpenClaw agent runtime.
           </p>
         </div>
         <div className="topbar-actions">
@@ -137,7 +137,7 @@ export default function DashboardPage() {
                     : `${agents.length} sandbox${agents.length === 1 ? "" : "es"} currently tracked.`}
                 </p>
               </div>
-              <span className="pill">Status, port, and runtime access</span>
+              <span className="pill">Powered by NVIDIA&apos;s OpenShell for safer sandboxing</span>
             </div>
 
             {agents.length === 0 ? (
@@ -181,8 +181,8 @@ export default function DashboardPage() {
 
         <aside className="card create-panel">
           <div className="card-title" style={{ marginBottom: "1rem" }}>
-            <h3>New sandbox</h3>
-            <p className="muted">Create a disposable runtime for demos, tests, or debugging.</p>
+            <h3>New DS-Claw runtime</h3>
+            <p className="muted">Create a personal, private, managed agent runtime for demos, tests, or debugging.</p>
           </div>
 
           {showForm ? (
@@ -211,7 +211,7 @@ export default function DashboardPage() {
           ) : (
             <div className="section-stack">
               <div className="notice">
-                This demo keeps agent lifecycle simple: create, inspect, delete.
+                DS-Claw keeps the lifecycle simple: create a managed runtime, inspect it, then remove it when the work is done.
               </div>
               <button className="button-wide" onClick={() => setShowForm(true)}>
                 Create new agent

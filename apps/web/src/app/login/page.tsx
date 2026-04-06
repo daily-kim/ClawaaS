@@ -36,26 +36,26 @@ export default function LoginPage() {
     <section className="page-shell auth-grid">
       <div className="hero-panel hero-panel-compact">
         <div className="hero-copy">
-          <span className="eyebrow">ClawaaS Demo</span>
-          <h1>Operate isolated agents from a simple browser console.</h1>
+          <span className="eyebrow">DS-Claw 🦞</span>
+          <h1>Sign in to your personal, private, managed OpenClaw runtime.</h1>
           <p>
-            This is a technical demo, not a polished product shell.
-            The goal is fast access to chat, logs, and sandbox files.
+            DS-Claw gives each operator a browser entrypoint into a managed OpenClaw-style agent workspace,
+            with fast access to chat, logs, files, and runtime controls.
           </p>
         </div>
 
         <div className="hero-list">
           <div className="hero-list-item">
-            <strong>Per-agent isolation</strong>
-            <span>Separate runtime surface for each task.</span>
+            <strong>Personal and private</strong>
+            <span>Each agent runtime stays isolated to its own user and workspace.</span>
           </div>
           <div className="hero-list-item">
-            <strong>Runtime inspection</strong>
-            <span>Logs and file access stay one click away.</span>
+            <strong>Managed runtime access</strong>
+            <span>Open logs, inspect files, and steer the agent from one console.</span>
           </div>
           <div className="hero-list-item">
-            <strong>Disposable workflow</strong>
-            <span>Create, inspect, and remove agents quickly.</span>
+            <strong>Safe sandbox foundation</strong>
+            <span>Powered by NVIDIA&apos;s OpenShell for a safer sandboxed execution surface.</span>
           </div>
         </div>
       </div>
@@ -63,8 +63,8 @@ export default function LoginPage() {
       <div className="auth-card">
         <div className="auth-header">
           <span className="eyebrow">Sign In</span>
-          <h2>Return to the workspace.</h2>
-          <p>Use your account to open the dashboard and manage active agents.</p>
+          <h2>Return to DS-Claw 🦞.</h2>
+          <p>Use your account to open your private agent console and manage active runtimes.</p>
         </div>
 
         {error && <p className="error">{error}</p>}
@@ -84,7 +84,7 @@ export default function LoginPage() {
         </form>
 
         <p className="muted">
-          Need an account? <a className="text-link" href="/signup">Create one</a>
+          Need DS-Claw 🦞 access? <a className="text-link" href="/signup">Create an account</a>
         </p>
       </div>
     </section>

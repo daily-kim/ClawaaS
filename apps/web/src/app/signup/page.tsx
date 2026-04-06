@@ -36,26 +36,26 @@ export default function SignupPage() {
     <section className="page-shell auth-grid">
       <div className="hero-panel hero-panel-compact">
         <div className="hero-copy">
-          <span className="eyebrow">ClawaaS Demo</span>
-          <h1>Create an operator account for the browser-based sandbox console.</h1>
+          <span className="eyebrow">DS-Claw 🦞</span>
+          <h1>Create access to a personal, private, managed OpenClaw workspace.</h1>
           <p>
-            This UI is intentionally simple. It is meant to expose core runtime controls
-            without pretending to be a fully finished product.
+            DS-Claw is a focused internal console for creating and operating managed agent runtimes
+            without exposing the host as a shared execution surface.
           </p>
         </div>
 
         <div className="hero-list">
           <div className="hero-list-item">
-            <strong>Agent isolation</strong>
-            <span>Separate Linux user and runtime per sandbox.</span>
+            <strong>Private by default</strong>
+            <span>Each account gets isolated Linux user, runtime state, and workspace boundaries.</span>
           </div>
           <div className="hero-list-item">
-            <strong>Direct inspection</strong>
-            <span>Open logs, files, and chat from the same console.</span>
+            <strong>Managed control</strong>
+            <span>Operate chat, files, logs, and lifecycle actions from one web console.</span>
           </div>
           <div className="hero-list-item">
-            <strong>Fast reset</strong>
-            <span>Delete and recreate a broken environment quickly.</span>
+            <strong>Safe sandbox layer</strong>
+            <span>Powered by NVIDIA&apos;s OpenShell to keep runtime execution sandboxed.</span>
           </div>
         </div>
       </div>
@@ -63,8 +63,8 @@ export default function SignupPage() {
       <div className="auth-card">
         <div className="auth-header">
           <span className="eyebrow">Create Account</span>
-          <h2>Open a new workspace seat.</h2>
-          <p>Set up credentials, then continue straight into the agent dashboard.</p>
+          <h2>Open your DS-Claw 🦞 workspace.</h2>
+          <p>Set up credentials, then continue straight into your managed agent dashboard.</p>
         </div>
 
         {error && <p className="error">{error}</p>}
@@ -84,7 +84,7 @@ export default function SignupPage() {
         </form>
 
         <p className="muted">
-          Already have an account? <a className="text-link" href="/login">Sign in</a>
+          Already have DS-Claw 🦞 access? <a className="text-link" href="/login">Sign in</a>
         </p>
       </div>
     </section>
