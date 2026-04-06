@@ -33,21 +33,60 @@ export default function SignupPage() {
   }
 
   return (
-    <section>
-      <h1>Sign Up</h1>
-      {error && <p className="error">{error}</p>}
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="email">Email</label>
-        <input id="email" name="email" type="email" required />
-        <label htmlFor="password">Password</label>
-        <input id="password" name="password" type="password" required />
-        <button type="submit" disabled={loading}>
-          {loading ? "Creating..." : "Create account"}
-        </button>
-      </form>
-      <p style={{ marginTop: "1rem" }}>
-        <a href="/login">Already have an account?</a>
-      </p>
+    <section className="page-shell auth-grid">
+      <div className="hero-panel hero-panel-compact">
+        <div className="hero-copy">
+          <span className="eyebrow">ClawaaS Demo</span>
+          <h1>Create an operator account for the browser-based sandbox console.</h1>
+          <p>
+            This UI is intentionally simple. It is meant to expose core runtime controls
+            without pretending to be a fully finished product.
+          </p>
+        </div>
+
+        <div className="hero-list">
+          <div className="hero-list-item">
+            <strong>Agent isolation</strong>
+            <span>Separate Linux user and runtime per sandbox.</span>
+          </div>
+          <div className="hero-list-item">
+            <strong>Direct inspection</strong>
+            <span>Open logs, files, and chat from the same console.</span>
+          </div>
+          <div className="hero-list-item">
+            <strong>Fast reset</strong>
+            <span>Delete and recreate a broken environment quickly.</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="auth-card">
+        <div className="auth-header">
+          <span className="eyebrow">Create Account</span>
+          <h2>Open a new workspace seat.</h2>
+          <p>Set up credentials, then continue straight into the agent dashboard.</p>
+        </div>
+
+        {error && <p className="error">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="auth-form">
+          <div className="field">
+            <label htmlFor="email">Email</label>
+            <input id="email" name="email" type="email" placeholder="operator@company.com" required />
+          </div>
+          <div className="field">
+            <label htmlFor="password">Password</label>
+            <input id="password" name="password" type="password" placeholder="Create a strong password" required />
+          </div>
+          <button className="auth-submit" type="submit" disabled={loading}>
+            {loading ? "Creating..." : "Create account"}
+          </button>
+        </form>
+
+        <p className="muted">
+          Already have an account? <a className="text-link" href="/login">Sign in</a>
+        </p>
+      </div>
     </section>
   );
 }
