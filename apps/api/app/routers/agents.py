@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app import provisioner
@@ -55,7 +56,10 @@ async def _get_owned_agent(agent_id: str, user_id: str) -> dict[str, object]:
 async def _bootstrap_agent_task(agent_id: str, linux_user: str) -> None:
     next_status = "ready"
     try:
-        await provisioner.bootstrap_agent(linux_user)
+        # inject_container_certs and bootstrap skipped for now —
+        # cert injection hangs, and nemotron reasoning model times out
+        # on the large bootstrap system prompt. Agent is usable without these.
+        pass
     except Exception:
         next_status = "error"
     async with get_connection() as connection:
@@ -72,19 +76,8 @@ async def create_agent(
     background_tasks: BackgroundTasks,
     user: dict[str, object] = Depends(get_current_user),
 ) -> dict[str, object]:
-    """Create and provision the current user's single agent."""
+    """Create and provision an agent for the current user."""
     async with get_connection() as connection:
-        existing_cursor = await connection.execute(
-            "SELECT id FROM agents WHERE user_id = ?",
-            (user["id"],),
-        )
-        existing_agent = await existing_cursor.fetchone()
-        if existing_agent is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="User already has an agent",
-            )
-
         agent_id = str(uuid4())
         linux_user = _agent_linux_user(agent_id)
         await connection.execute(
@@ -164,6 +157,61 @@ async def get_agent(
 ) -> dict[str, object]:
     """Fetch a single agent owned by the current user."""
     return await _get_owned_agent(id, str(user["id"]))
+
+
+@router.get("/{id}/logs")
+async def stream_agent_logs(
+    id: str = Path(..., description="Agent identifier"),
+    since: str = Query(default="10m"),
+    user: dict[str, object] = Depends(get_current_user),
+) -> StreamingResponse:
+    """Stream gateway journal logs as SSE."""
+    agent = await _get_owned_agent(id, str(user["id"]))
+    return StreamingResponse(
+        provisioner.stream_gateway_logs(str(agent["linux_user"]), since=since),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.delete("/{id}", status_code=status.HTTP_200_OK)
+async def delete_agent(
+    id: str = Path(..., description="Agent identifier"),
+    user: dict[str, object] = Depends(get_current_user),
+) -> dict[str, str]:
+    """Delete an agent and all its resources."""
+    agent = await _get_owned_agent(id, str(user["id"]))
+
+    if agent["status"] == "deleting":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Already deleting",
+        )
+
+    async with get_connection() as connection:
+        await connection.execute(
+            "UPDATE agents SET status = 'deleting' WHERE id = ?", (id,)
+        )
+        await connection.commit()
+
+    try:
+        await provisioner.delete_agent(str(agent["linux_user"]))
+    except Exception as exc:
+        async with get_connection() as connection:
+            await connection.execute(
+                "UPDATE agents SET status = 'error' WHERE id = ?", (id,)
+            )
+            await connection.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+
+    async with get_connection() as connection:
+        await connection.execute("DELETE FROM agents WHERE id = ?", (id,))
+        await connection.commit()
+
+    return {"ok": "deleted", "id": id}
 
 
 @router.post("/{id}/bootstrap", status_code=status.HTTP_202_ACCEPTED)

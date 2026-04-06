@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, clearToken } from "@/lib/api";
 
@@ -22,6 +22,8 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [creating, setCreating] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -39,19 +41,37 @@ export default function DashboardPage() {
       });
   }, [router]);
 
-  async function createAgent() {
+  async function createAgent(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const name = (form.get("name") as string).trim() || "My Agent";
     setCreating(true);
     setError("");
     try {
       const agent = await api<Agent>("/agents", {
         method: "POST",
-        body: JSON.stringify({ name: "My Agent" }),
+        body: JSON.stringify({ name }),
       });
       setAgents((prev) => [...prev, agent]);
+      setShowForm(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create agent");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function deleteAgent(agentId: string) {
+    if (!confirm("Delete this agent? This cannot be undone.")) return;
+    setDeletingId(agentId);
+    setError("");
+    try {
+      await api(`/agents/${agentId}`, { method: "DELETE" });
+      setAgents((prev) => prev.filter((a) => a.id !== agentId));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete agent");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -77,44 +97,63 @@ export default function DashboardPage() {
 
       {error && <p className="error">{error}</p>}
 
-      {agents.length === 0 ? (
-        <div className="card" style={{ textAlign: "center" }}>
-          <p style={{ marginBottom: "0.75rem" }}>No agents yet.</p>
-          <button onClick={createAgent} disabled={creating}>
-            {creating ? "Creating..." : "New Agent"}
-          </button>
-        </div>
-      ) : (
-        agents.map((agent) => (
-          <div className="card" key={agent.id}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div>
-                <strong>{agent.name || "Agent"}</strong>
-                <span className={`status status-${agent.status}`} style={{ marginLeft: "0.5rem" }}>
-                  {agent.status}
-                </span>
-              </div>
+      {agents.map((agent) => (
+        <div className="card" key={agent.id}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div>
+              <strong>{agent.name || "Agent"}</strong>
+              <span className={`status status-${agent.status}`} style={{ marginLeft: "0.5rem" }}>
+                {agent.status}
+              </span>
+            </div>
+            <div className="link-row">
               <a href={`/agents/${agent.id}`}>
                 <button>Chat</button>
               </a>
+              <a href={`/agents/${agent.id}/logs`}>
+                <button style={{ background: "#6b7280" }}>Logs</button>
+              </a>
+              <button
+                onClick={() => deleteAgent(agent.id)}
+                disabled={deletingId === agent.id}
+                style={{ background: "#dc2626" }}
+              >
+                {deletingId === agent.id ? "..." : "Delete"}
+              </button>
             </div>
-            <p style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: "0.25rem" }}>
-              {agent.linux_user} &middot; port {agent.port ?? "—"}
-            </p>
           </div>
-        ))
-      )}
+          <p style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: "0.25rem" }}>
+            {agent.linux_user} &middot; port {agent.port ?? "—"}
+          </p>
+        </div>
+      ))}
 
-      {agents.length > 0 && agents.every((a) => a.status !== "created") && (
-        <p style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "0.5rem" }}>
-          1 user = 1 agent (demo)
-        </p>
+      {showForm ? (
+        <form onSubmit={createAgent} className="card" style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <input
+            name="name"
+            type="text"
+            placeholder="Agent name"
+            autoFocus
+            style={{ flex: 1, padding: "0.4rem 0.6rem", borderRadius: "6px", border: "1px solid #d1d5db" }}
+          />
+          <button type="submit" disabled={creating}>
+            {creating ? "Creating..." : "Create"}
+          </button>
+          <button type="button" onClick={() => setShowForm(false)} style={{ background: "#6b7280" }}>
+            Cancel
+          </button>
+        </form>
+      ) : (
+        <button onClick={() => setShowForm(true)} style={{ marginTop: "0.5rem" }}>
+          + New Agent
+        </button>
       )}
     </section>
   );

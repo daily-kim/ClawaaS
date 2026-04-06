@@ -10,8 +10,11 @@ Cmnd_Alias CLAWAAS_CMDS = __PROJECT__/ops/runtime/create_linux_user.sh [0-9a-fA-
     __PROJECT__/ops/runtime/start_gateway.sh oc_u_*, \
     __PROJECT__/ops/runtime/stop_gateway.sh oc_u_*, \
     __PROJECT__/ops/runtime/bootstrap_agent.sh oc_u_*, \
+    __PROJECT__/ops/runtime/delete_agent.sh oc_u_*, \
+    __PROJECT__/ops/runtime/inject_container_certs.sh oc_u_*, \
     /usr/bin/chown -R oc_u_*\:oc_u_* /home/oc_u_*/.openclaw, \
     /usr/bin/cat /home/oc_u_*/.openclaw/gateway.env, \
+    /usr/bin/journalctl -u openclaw-gateway@oc_u_*.service *, \
     /bin/systemctl start openclaw-gateway@oc_u_*.service, \
     /bin/systemctl stop openclaw-gateway@oc_u_*.service, \
     /bin/systemctl restart openclaw-gateway@oc_u_*.service

@@ -51,7 +51,7 @@ response=$(sudo -u "${linux_user}" \
       OPENCLAW_HOME="/home/${linux_user}" \
       TMPDIR="/home/${linux_user}/.openclaw/tmp" \
   openclaw agent \
-    --session-id "bootstrap-${linux_user}" \
+    --session-id "bootstrap-${linux_user//_/-}" \
     --message "${bootstrap_message}" \
     --json \
     --timeout 120 \

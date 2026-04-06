@@ -95,6 +95,34 @@ button:disabled {
   color: #3730a3;
 }
 
+.status-deleting {
+  background: #fed7aa;
+  color: #9a3412;
+}
+
+.terminal {
+  background: #0d1117;
+  color: #e0e0e0;
+  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  font-size: 0.78rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  height: 520px;
+  overflow-y: auto;
+  line-height: 1.6;
+  border: 1px solid #21262d;
+}
+
+.log-line {
+  padding: 1px 0;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.log-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .chat-messages {
   min-height: 300px;
   max-height: 500px;

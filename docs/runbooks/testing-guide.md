@@ -7,7 +7,7 @@
 ```bash
 export CLAWAAS_LLM_API_URL="https://your-litellm-endpoint"
 export CLAWAAS_LLM_MODEL="your-model-name"
-export LITELLM_API_KEY="sk-xxx"
+export CLAWAAS_API_KEY="sk-xxx"
 ```
 
 ---
@@ -39,7 +39,7 @@ LLM 연동 없이 실행 가능. 검증 항목:
 ```bash
 sudo CLAWAAS_LLM_API_URL="${CLAWAAS_LLM_API_URL}" \
      CLAWAAS_LLM_MODEL="${CLAWAAS_LLM_MODEL}" \
-     LITELLM_API_KEY="${LITELLM_API_KEY}" \
+     CLAWAAS_API_KEY="${CLAWAAS_API_KEY}" \
      bash tests/smoke/single_user_runtime.sh
 ```
 
@@ -90,7 +90,7 @@ LINUX_USER=$(echo "$AGENT" | python3 -c "import sys,json; print(json.load(sys.st
 ### c. API key 주입 + gateway 재시작
 
 ```bash
-sudo bash -c "echo 'LITELLM_API_KEY=${LITELLM_API_KEY}' >> /home/${LINUX_USER}/.openclaw/gateway.env"
+sudo bash -c "echo 'CLAWAAS_API_KEY=${CLAWAAS_API_KEY}' >> /home/${LINUX_USER}/.openclaw/gateway.env"
 sudo systemctl restart openclaw-gateway@${LINUX_USER}.service
 ```
 
@@ -140,7 +140,7 @@ rm -f clawaas.db
 | 증상 | 원인 | 해결 |
 |------|------|------|
 | `verify_host.sh`에서 `[FAIL]` | 바이너리 미설치 | `install_runtime.sh` 재실행 |
-| gateway `activating` 후 `failed` | LITELLM_API_KEY 누락 | gateway.env에 key 추가 후 restart |
+| gateway `activating` 후 `failed` | CLAWAAS_API_KEY 누락 | gateway.env에 key 추가 후 restart |
 | `network connection error` | Node.js TLS 인증서 | systemd unit에 `NODE_OPTIONS=--use-system-ca` 확인 |
 | `OPENCLAW_HOME/.openclaw` 중복 경로 | OPENCLAW_HOME이 `.openclaw`을 포함 | `OPENCLAW_HOME=/home/<user>` (홈 디렉토리 자체) |
 | bootstrap READY 안 옴 | LLM API 미설정 | 환경변수 3개 설정 확인 |

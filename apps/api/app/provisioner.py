@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import re
 import shlex
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 from app.config import get_settings
@@ -44,12 +45,22 @@ async def render_config(
     port_registry: str = "/var/lib/clawaas/port-registry.json",
 ) -> int:
     """Render the per-user OpenClaw config, fix ownership, and return the allocated port."""
+    settings = get_settings()
     script_path = _project_root() / "ops/runtime/render_openclaw_config.py"
     output_path = f"/home/{linux_user}/.openclaw/openclaw.json"
+
+    # Pass LLM env vars through sudo so render script can build models section
+    env_parts = []
+    if settings.llm_api_url:
+        env_parts.append(f"CLAWAAS_LLM_API_URL={shlex.quote(settings.llm_api_url)}")
+    if settings.llm_model:
+        env_parts.append(f"CLAWAAS_LLM_MODEL={shlex.quote(settings.llm_model)}")
+
     await _run_command(
         " ".join(
             [
                 "sudo",
+                *env_parts,
                 "python3",
                 shlex.quote(str(script_path)),
                 shlex.quote(linux_user),
@@ -58,6 +69,14 @@ async def render_config(
             ]
         )
     )
+
+    # Write actual CLAWAAS_API_KEY into gateway.env if configured
+    if settings.api_key:
+        env_path = f"/home/{linux_user}/.openclaw/gateway.env"
+        await _run_command(
+            f"sudo bash -c {shlex.quote(f'echo CLAWAAS_API_KEY={settings.api_key} >> {env_path}')}"
+        )
+
     await _run_command(
         " ".join(
             [
@@ -93,10 +112,50 @@ async def stop_gateway(linux_user: str) -> None:
     )
 
 
+async def inject_container_certs(linux_user: str) -> None:
+    """Inject host CA certs into the OpenShell k3s container (for TLS proxies)."""
+    script_path = _project_root() / "ops/runtime/inject_container_certs.sh"
+    try:
+        await _run_command(
+            f"sudo bash {shlex.quote(str(script_path))} {shlex.quote(linux_user)}"
+        )
+    except RuntimeError:
+        pass  # Non-fatal: sandbox may still work without extra certs
+
+
 async def bootstrap_agent(linux_user: str) -> str:
     """Run the bootstrap script for a Linux user."""
     script_path = _project_root() / "ops/runtime/bootstrap_agent.sh"
     return await _run_command(
+        f"sudo bash {shlex.quote(str(script_path))} {shlex.quote(linux_user)}"
+    )
+
+
+async def stream_gateway_logs(linux_user: str, since: str = "10m") -> AsyncIterator[str]:
+    """Stream gateway journal logs as SSE events."""
+    unit = f"openclaw-gateway@{linux_user}.service"
+    process = await asyncio.create_subprocess_exec(
+        "sudo", "journalctl", "-u", unit,
+        f"--since={since} ago", "--follow", "--no-pager", "-o", "short-iso",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        assert process.stdout is not None
+        while True:
+            line = await process.stdout.readline()
+            if not line:
+                break
+            yield f"data: {line.decode().rstrip()}\n\n"
+    finally:
+        process.terminate()
+        await process.wait()
+
+
+async def delete_agent(linux_user: str) -> None:
+    """Delete all resources for a Linux user (gateway, home, port registry)."""
+    script_path = _project_root() / "ops/runtime/delete_agent.sh"
+    await _run_command(
         f"sudo bash {shlex.quote(str(script_path))} {shlex.quote(linux_user)}"
     )
 

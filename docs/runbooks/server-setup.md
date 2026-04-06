@@ -140,7 +140,7 @@ sudo bash tests/smoke/two_user_isolation.sh
 # LLM 연동 포함 전체 테스트
 sudo CLAWAAS_LLM_API_URL="https://your-llm-endpoint" \
      CLAWAAS_LLM_MODEL="your-model-name" \
-     LITELLM_API_KEY="sk-xxx" \
+     CLAWAAS_API_KEY="sk-xxx" \
      bash tests/smoke/single_user_runtime.sh
 ```
 
@@ -185,6 +185,6 @@ sudo systemctl daemon-reload
 sudo bash tests/smoke/two_user_isolation.sh
 sudo CLAWAAS_LLM_API_URL="https://your-llm-endpoint" \
      CLAWAAS_LLM_MODEL="your-model-name" \
-     LITELLM_API_KEY="sk-xxx" \
+     CLAWAAS_API_KEY="sk-xxx" \
      bash tests/smoke/single_user_runtime.sh
 ```

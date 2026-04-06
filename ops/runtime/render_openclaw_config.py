@@ -35,11 +35,12 @@ def allocate_port(linux_user: str, registry_path: str = DEFAULT_PORT_REGISTRY) -
     if linux_user in registry:
         return registry[linux_user]
 
-    # Find next available port
+    # Find next available port — step by 10 because each gateway uses
+    # multiple ports (main, main+2 for browser control, etc.)
     used_ports = set(registry.values())
     port = BASE_GATEWAY_PORT
     while port in used_ports:
-        port += 1
+        port += 10
 
     registry[linux_user] = port
     reg_path.parent.mkdir(parents=True, exist_ok=True)
@@ -103,7 +104,7 @@ def render_config(
                     "apiKey": {
                         "source": "env",
                         "provider": "default",
-                        "id": "LITELLM_API_KEY",
+                        "id": "CLAWAAS_API_KEY",
                     },
                     "api": "openai-completions",
                     "auth": "api-key",
@@ -159,9 +160,9 @@ def main(argv: list[str]) -> int:
     # Write gateway.env for systemd EnvironmentFile
     env_path = output_path.parent / "gateway.env"
     env_lines = [f"CLAWAAS_GATEWAY_PORT={port}"]
-    # LITELLM_API_KEY must be set by the operator (or via FastAPI provisioner)
+    # CLAWAAS_API_KEY must be set by the operator (or via FastAPI provisioner)
     # Include placeholder so the env file structure is ready
-    env_lines.append("# LITELLM_API_KEY=<set-by-operator>")
+    env_lines.append("# CLAWAAS_API_KEY=<set-by-operator>")
     env_path.write_text("\n".join(env_lines) + "\n", encoding="utf-8")
 
     print(f"Config written to {output_path} (port: {port})")

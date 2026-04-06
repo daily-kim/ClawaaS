@@ -45,11 +45,11 @@ echo "=== [4/6] Install systemd unit ==="
 cp "${PROJECT_ROOT}/ops/systemd/openclaw-gateway@.service" /etc/systemd/system/
 systemctl daemon-reload
 
-# Inject LITELLM_API_KEY into gateway.env if provided
-if [[ -n "${LITELLM_API_KEY:-}" ]]; then
-  echo "LITELLM_API_KEY=${LITELLM_API_KEY}" >> "/home/${LINUX_USER}/.openclaw/gateway.env"
+# Inject CLAWAAS_API_KEY into gateway.env if provided
+if [[ -n "${CLAWAAS_API_KEY:-}" ]]; then
+  echo "CLAWAAS_API_KEY=${CLAWAAS_API_KEY}" >> "/home/${LINUX_USER}/.openclaw/gateway.env"
   chown "${LINUX_USER}:${LINUX_USER}" "/home/${LINUX_USER}/.openclaw/gateway.env"
-  echo "LITELLM_API_KEY injected into gateway.env"
+  echo "CLAWAAS_API_KEY injected into gateway.env"
 fi
 
 echo ""

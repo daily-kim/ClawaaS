@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     project_root: str = Field(default="")
     gateway_base_url: str = Field(default="http://127.0.0.1:18800")
     cors_allow_origins: list[str] = Field(default_factory=lambda: ["*"])
+    llm_api_url: str = Field(default="")
+    llm_model: str = Field(default="")
+    api_key: str = Field(default="")
 
     model_config = {"env_prefix": "CLAWAAS_", "case_sensitive": False}
 

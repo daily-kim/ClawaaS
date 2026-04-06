@@ -72,7 +72,13 @@ export default function AgentChatPage() {
       try {
         const inner = JSON.parse(data.response);
         const payloads = inner?.result?.payloads;
-        text = payloads?.map((p: { text: string }) => p.text).join("\n") || data.response;
+        if (Array.isArray(payloads) && payloads.length > 0) {
+          text = payloads.map((p: { text: string }) => p.text).join("\n");
+        } else {
+          // Empty payloads — show status/summary instead of raw JSON
+          const summary = inner?.summary || inner?.status || "No response";
+          text = `[${summary}]`;
+        }
       } catch {
         text = data.response;
       }
@@ -93,13 +99,14 @@ export default function AgentChatPage() {
         <h1>{agent.name || "Agent"}</h1>
         <div className="link-row">
           <span className={`status status-${agent.status}`}>{agent.status}</span>
+          <a href={`/agents/${id}/logs`}>Logs</a>
           <a href="/dashboard">Back</a>
         </div>
       </div>
 
       {agent.status === "bootstrapping" && (
         <div className="card" style={{ textAlign: "center", background: "#fef9c3" }}>
-          Agent is bootstrapping... please wait.
+          Agent is bootstrapping... <a href={`/agents/${id}/logs`}>Watch logs</a>
         </div>
       )}
 

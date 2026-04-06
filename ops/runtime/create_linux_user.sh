@@ -32,6 +32,12 @@ if id "${linux_user}" >/dev/null 2>&1; then
 fi
 
 useradd --create-home --home-dir "${home_dir}" --shell /bin/bash "${linux_user}"
+
+# Add to docker group so OpenShell sandbox can access Docker daemon
+if getent group docker >/dev/null 2>&1; then
+  usermod -aG docker "${linux_user}"
+  echo "Added ${linux_user} to docker group"
+fi
 install -d -m 700 -o "${linux_user}" -g "${linux_user}" "${home_dir}/.openclaw"
 install -d -m 700 -o "${linux_user}" -g "${linux_user}" "${home_dir}/.openclaw/tmp"
 install -d -m 700 -o "${linux_user}" -g "${linux_user}" "${home_dir}/workspace"
