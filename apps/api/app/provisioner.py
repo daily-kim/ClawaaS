@@ -160,6 +160,112 @@ async def delete_agent(linux_user: str) -> None:
     )
 
 
+async def _find_sandbox_workspace(agent_id: str) -> str:
+    """Locate the sandbox PVC workspace path for an agent inside the OpenShell container."""
+    # PVC directory names contain the agent UUID (with truncated/modified hyphens)
+    # Search inside the k3s storage for a matching workspace PVC
+    try:
+        output = await _run_command(
+            "sudo docker exec openshell-cluster-openshell "
+            f"find /var/lib/rancher/k3s/storage -maxdepth 1 -type d "
+            f"-name '*workspace-openclaw*{shlex.quote(agent_id[:8])}*'"
+        )
+        if output.strip():
+            return output.strip().splitlines()[0]
+    except RuntimeError:
+        pass
+    raise RuntimeError(f"Sandbox workspace not found for agent {agent_id}")
+
+
+async def list_files(agent_id: str, linux_user: str, rel_path: str = ".") -> list[dict[str, object]]:
+    """List files in the agent's sandbox workspace directory."""
+    try:
+        workspace = await _find_sandbox_workspace(agent_id)
+    except RuntimeError:
+        # Fallback to host workspace
+        workspace = f"/home/{linux_user}/workspace"
+        target = f"{workspace}/{rel_path}"
+        output = await _run_command(
+            f"sudo -u {shlex.quote(linux_user)} "
+            f"find {shlex.quote(target)} -maxdepth 1 -mindepth 1 "
+            f"-printf '%y %s %f\\n' 2>/dev/null | sort -k3"
+        )
+        return _parse_find_output(output)
+
+    target = f"{workspace}/{rel_path}"
+    output = await _run_command(
+        f"sudo docker exec openshell-cluster-openshell "
+        f"find {shlex.quote(target)} -maxdepth 1 -mindepth 1 "
+        f"-printf '%y %s %f\\n' 2>/dev/null | sort -k3"
+    )
+    return _parse_find_output(output)
+
+
+def _parse_find_output(output: str) -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    for line in output.strip().splitlines():
+        if not line:
+            continue
+        parts = line.split(" ", 2)
+        if len(parts) < 3:
+            continue
+        kind, size, name = parts
+        entries.append({
+            "name": name,
+            "type": "dir" if kind == "d" else "file",
+            "size": int(size) if kind != "d" else None,
+        })
+    return entries
+
+
+async def read_file(agent_id: str, linux_user: str, rel_path: str) -> str:
+    """Read a file from the agent's sandbox workspace."""
+    try:
+        workspace = await _find_sandbox_workspace(agent_id)
+    except RuntimeError:
+        workspace = f"/home/{linux_user}/workspace"
+        target = f"{workspace}/{rel_path}"
+        return await _run_command(
+            f"sudo -u {shlex.quote(linux_user)} cat {shlex.quote(target)}"
+        )
+
+    target = f"{workspace}/{rel_path}"
+    return await _run_command(
+        f"sudo docker exec openshell-cluster-openshell cat {shlex.quote(target)}"
+    )
+
+
+async def write_file(agent_id: str, linux_user: str, rel_path: str, content: str) -> None:
+    """Write content to a file in the agent's sandbox workspace."""
+    try:
+        workspace = await _find_sandbox_workspace(agent_id)
+    except RuntimeError:
+        workspace = f"/home/{linux_user}/workspace"
+        target = f"{workspace}/{rel_path}"
+        process = await asyncio.create_subprocess_exec(
+            "sudo", "-u", linux_user, "tee", target,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate(content.encode())
+        if process.returncode != 0:
+            raise RuntimeError(stderr.decode().strip())
+        return
+
+    target = f"{workspace}/{rel_path}"
+    process = await asyncio.create_subprocess_exec(
+        "sudo", "docker", "exec", "-i", "openshell-cluster-openshell",
+        "tee", target,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await process.communicate(content.encode())
+    if process.returncode != 0:
+        raise RuntimeError(stderr.decode().strip())
+
+
 async def run_agent_turn(linux_user: str, session_id: str, message: str) -> str:
     """Run one agent turn as the provisioned Linux user."""
     home = f"/home/{linux_user}"

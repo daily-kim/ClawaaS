@@ -113,6 +113,36 @@ button:disabled {
   border: 1px solid #21262d;
 }
 
+.tab-bar {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.tab {
+  padding: 0.5rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  color: #6b7280;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.tab:hover {
+  color: #1a1a1a;
+  background: none;
+}
+
+.tab-active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+  font-weight: 600;
+}
+
 .log-line {
   padding: 1px 0;
   word-break: break-word;
@@ -181,4 +211,132 @@ a:hover {
   display: flex;
   gap: 1rem;
   align-items: center;
+}
+
+/* File browser */
+.file-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.file-nav-btn {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.file-nav-btn:hover {
+  background: #d1d5db;
+}
+
+.file-nav-btn:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.file-path {
+  color: #6b7280;
+  font-family: monospace;
+  font-size: 0.85rem;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-list {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.file-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 0.9rem;
+}
+
+.file-entry:last-child {
+  border-bottom: none;
+}
+
+.file-entry:hover {
+  background: #f9fafb;
+}
+
+.file-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  text-align: center;
+}
+
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  color: #9ca3af;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.file-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #9ca3af;
+}
+
+.file-editor {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.file-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.file-editor-name {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-editor-header button {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.file-editor-textarea {
+  width: 100%;
+  min-height: 480px;
+  padding: 0.75rem 1rem;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  resize: vertical;
+  background: #fafafa;
 }

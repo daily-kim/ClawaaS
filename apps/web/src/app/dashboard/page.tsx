@@ -114,10 +114,7 @@ export default function DashboardPage() {
             </div>
             <div className="link-row">
               <a href={`/agents/${agent.id}`}>
-                <button>Chat</button>
-              </a>
-              <a href={`/agents/${agent.id}/logs`}>
-                <button style={{ background: "#6b7280" }}>Logs</button>
+                <button>Open</button>
               </a>
               <button
                 onClick={() => deleteAgent(agent.id)}

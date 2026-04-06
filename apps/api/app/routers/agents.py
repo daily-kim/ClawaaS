@@ -159,6 +159,58 @@ async def get_agent(
     return await _get_owned_agent(id, str(user["id"]))
 
 
+@router.get("/{id}/files")
+async def list_agent_files(
+    id: str = Path(..., description="Agent identifier"),
+    path: str = Query(default="."),
+    user: dict[str, object] = Depends(get_current_user),
+) -> list[dict[str, object]]:
+    """List files in the agent's workspace."""
+    agent = await _get_owned_agent(id, str(user["id"]))
+    if ".." in path:
+        raise HTTPException(status_code=400, detail="Invalid path")
+    return await provisioner.list_files(str(agent["id"]), str(agent["linux_user"]), path)
+
+
+@router.get("/{id}/files/read")
+async def read_agent_file(
+    id: str = Path(..., description="Agent identifier"),
+    path: str = Query(...),
+    user: dict[str, object] = Depends(get_current_user),
+) -> dict[str, str]:
+    """Read a file from the agent's workspace."""
+    agent = await _get_owned_agent(id, str(user["id"]))
+    if ".." in path:
+        raise HTTPException(status_code=400, detail="Invalid path")
+    try:
+        content = await provisioner.read_file(str(agent["id"]), str(agent["linux_user"]), path)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"path": path, "content": content}
+
+
+class WriteFileRequest(BaseModel):
+    path: str
+    content: str
+
+
+@router.put("/{id}/files/write")
+async def write_agent_file(
+    payload: WriteFileRequest,
+    id: str = Path(..., description="Agent identifier"),
+    user: dict[str, object] = Depends(get_current_user),
+) -> dict[str, str]:
+    """Write a file in the agent's workspace."""
+    agent = await _get_owned_agent(id, str(user["id"]))
+    if ".." in payload.path:
+        raise HTTPException(status_code=400, detail="Invalid path")
+    try:
+        await provisioner.write_file(str(agent["id"]), str(agent["linux_user"]), payload.path, payload.content)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"ok": "written", "path": payload.path}
+
+
 @router.get("/{id}/logs")
 async def stream_agent_logs(
     id: str = Path(..., description="Agent identifier"),
