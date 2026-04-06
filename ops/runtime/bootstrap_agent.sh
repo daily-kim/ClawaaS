@@ -68,7 +68,6 @@ if echo "${response}" | grep -qi "READY"; then
   echo "READY — bootstrap successful."
   exit 0
 else
-  echo "Warning: READY not found in response, but agent turn completed." >&2
-  echo "This may be expected if no LLM API is configured yet." >&2
-  exit 0
+  echo "Error: READY not found in bootstrap response." >&2
+  exit 2
 fi

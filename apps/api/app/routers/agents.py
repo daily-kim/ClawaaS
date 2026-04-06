@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Query, status
@@ -12,6 +13,54 @@ from app.db import get_connection
 
 
 router = APIRouter(prefix="/agents", tags=["agents"])
+
+
+def _extract_chat_text(raw: str) -> str:
+    """Best-effort extraction of assistant-visible text from mixed CLI output."""
+    decoder = json.JSONDecoder()
+    parsed_objects: list[dict[str, object]] = []
+
+    for index, char in enumerate(raw):
+        if char != "{":
+            continue
+        try:
+            parsed, _ = decoder.raw_decode(raw[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            parsed_objects.append(parsed)
+
+    for parsed in reversed(parsed_objects):
+        result = parsed.get("result")
+        if not isinstance(result, dict):
+            continue
+        payloads = result.get("payloads")
+        if not isinstance(payloads, list):
+            continue
+        texts = [
+            payload.get("text", "").strip()
+            for payload in payloads
+            if isinstance(payload, dict) and isinstance(payload.get("text"), str)
+        ]
+        joined = "\n".join(text for text in texts if text)
+        if joined:
+            return joined
+
+    lines = [line.strip() for line in raw.splitlines()]
+    for line in reversed(lines):
+        if not line:
+            continue
+        if line == "READY":
+            continue
+        if line.startswith("[") and "]" in line:
+            continue
+        if "openclaw-gateway@" in line or line.startswith("Starting ") or line.startswith("Started "):
+            continue
+        if "Config overwrite:" in line or "Config write anomaly:" in line:
+            continue
+        return line
+
+    return raw.strip()
 
 
 class CreateAgentRequest(BaseModel):
@@ -56,10 +105,7 @@ async def _get_owned_agent(agent_id: str, user_id: str) -> dict[str, object]:
 async def _bootstrap_agent_task(agent_id: str, linux_user: str) -> None:
     next_status = "ready"
     try:
-        # inject_container_certs and bootstrap skipped for now —
-        # cert injection hangs, and nemotron reasoning model times out
-        # on the large bootstrap system prompt. Agent is usable without these.
-        pass
+        await provisioner.bootstrap_agent(linux_user)
     except Exception:
         next_status = "error"
     async with get_connection() as connection:
@@ -167,6 +213,11 @@ async def list_agent_files(
 ) -> list[dict[str, object]]:
     """List files in the agent's workspace."""
     agent = await _get_owned_agent(id, str(user["id"]))
+    if agent["status"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Workspace not initialized yet (status: {agent['status']})",
+        )
     if ".." in path:
         raise HTTPException(status_code=400, detail="Invalid path")
     return await provisioner.list_files(str(agent["id"]), str(agent["linux_user"]), path)
@@ -180,6 +231,11 @@ async def read_agent_file(
 ) -> dict[str, str]:
     """Read a file from the agent's workspace."""
     agent = await _get_owned_agent(id, str(user["id"]))
+    if agent["status"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Workspace not initialized yet (status: {agent['status']})",
+        )
     if ".." in path:
         raise HTTPException(status_code=400, detail="Invalid path")
     try:
@@ -202,6 +258,11 @@ async def write_agent_file(
 ) -> dict[str, str]:
     """Write a file in the agent's workspace."""
     agent = await _get_owned_agent(id, str(user["id"]))
+    if agent["status"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Workspace not initialized yet (status: {agent['status']})",
+        )
     if ".." in payload.path:
         raise HTTPException(status_code=400, detail="Invalid path")
     try:
@@ -304,4 +365,4 @@ async def chat_with_agent(
         str(agent["id"]),
         payload.message,
     )
-    return {"response": response}
+    return {"response": response, "text": _extract_chat_text(response)}

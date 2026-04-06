@@ -6,9 +6,13 @@ TODO: Add validation for gateway URLs, sudo provisioner paths, and runtime timeo
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
+
+
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -25,7 +29,12 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="")
     api_key: str = Field(default="")
 
-    model_config = {"env_prefix": "CLAWAAS_", "case_sensitive": False}
+    model_config = {
+        "env_prefix": "CLAWAAS_",
+        "case_sensitive": False,
+        "env_file": str(ENV_FILE),
+        "env_file_encoding": "utf-8",
+    }
 
 
 @lru_cache(maxsize=1)

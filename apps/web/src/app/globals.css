@@ -307,6 +307,28 @@ button:disabled {
   gap: 0.55rem;
 }
 
+.topbar-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.25rem;
+}
+
+.meta-chip {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 120px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f4f8fc;
+}
+
+.meta-chip strong {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
 .topbar-copy h1 {
   font-size: clamp(2rem, 3vw, 3rem);
 }
@@ -527,7 +549,7 @@ button:disabled {
 
 .chat-messages {
   min-height: 0;
-  max-height: 280px;
+  max-height: 420px;
   overflow-y: auto;
   display: grid;
   gap: 0.55rem;
@@ -565,7 +587,7 @@ button:disabled {
 }
 
 .chat-form textarea {
-  min-height: 56px;
+  min-height: 84px;
   resize: vertical;
 }
 

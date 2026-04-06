@@ -89,6 +89,7 @@ export default function AgentPage() {
   const [filePath, setFilePath] = useState(".");
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
+  const [filesError, setFilesError] = useState("");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
   const [fileEdited, setFileEdited] = useState(false);
@@ -175,9 +176,15 @@ export default function AgentPage() {
     if (tab !== "files" || !agent) return;
     let cancelled = false;
     setLoadingFiles(true);
+    setFilesError("");
     api<FileEntry[]>(`/agents/${id}/files?path=${encodeURIComponent(filePath)}`)
       .then((data) => { if (!cancelled) setEntries(data); })
-      .catch(() => { if (!cancelled) setEntries([]); })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setEntries([]);
+          setFilesError(err instanceof Error ? err.message : "Failed to load files");
+        }
+      })
       .finally(() => { if (!cancelled) setLoadingFiles(false); });
     return () => { cancelled = true; };
   }, [tab, agent, id, filePath]);
@@ -239,23 +246,27 @@ export default function AgentPage() {
     setSending(true);
 
     try {
-      const data = await api<{ response: string }>(`/agents/${id}/chat`, {
+      const data = await api<{ response: string; text?: string }>(`/agents/${id}/chat`, {
         method: "POST",
         body: JSON.stringify({ message }),
       });
 
       let text: string;
-      try {
-        const inner = JSON.parse(data.response);
-        const payloads = inner?.result?.payloads;
-        if (Array.isArray(payloads) && payloads.length > 0) {
-          text = payloads.map((p: { text: string }) => p.text).join("\n");
-        } else {
-          const summary = inner?.summary || inner?.status || "No response";
-          text = `[${summary}]`;
+      if (data.text && data.text.trim()) {
+        text = data.text;
+      } else {
+        try {
+          const inner = JSON.parse(data.response);
+          const payloads = inner?.result?.payloads;
+          if (Array.isArray(payloads) && payloads.length > 0) {
+            text = payloads.map((p: { text: string }) => p.text).join("\n");
+          } else {
+            const summary = inner?.summary || inner?.status || "No response";
+            text = `[${summary}]`;
+          }
+        } catch {
+          text = data.response;
         }
-      } catch {
-        text = data.response;
       }
 
       setMessages((prev) => [...prev, { role: "agent", text }]);
@@ -275,29 +286,28 @@ export default function AgentPage() {
           <span className="eyebrow">Agent Workspace</span>
           <h1>{agent.name || "Agent"}</h1>
           <p className="muted">Inspect runtime state, then use chat, logs, or files as needed.</p>
+          <div className="topbar-meta">
+            <div className="meta-chip">
+              <span className="meta-label">Status</span>
+              <strong>{agent.status}</strong>
+            </div>
+            <div className="meta-chip">
+              <span className="meta-label">Chat messages</span>
+              <strong>{messages.length}</strong>
+            </div>
+            <div className="meta-chip">
+              <span className="meta-label">Log lines</span>
+              <strong>{lines.length}</strong>
+            </div>
+            <div className="meta-chip">
+              <span className="meta-label">Current path</span>
+              <strong>{filePath === "." ? "/" : filePath}</strong>
+            </div>
+          </div>
         </div>
         <div className="topbar-actions">
           <span className={`status status-${agent.status}`}>{agent.status}</span>
           <a className="text-link" href="/dashboard">Back to dashboard</a>
-        </div>
-      </div>
-
-      <div className="stats-strip">
-        <div className="stat-tile">
-          <span>Status</span>
-          <strong>{agent.status}</strong>
-        </div>
-        <div className="stat-tile">
-          <span>Chat messages</span>
-          <strong>{messages.length}</strong>
-        </div>
-        <div className="stat-tile">
-          <span>Log lines</span>
-          <strong>{lines.length}</strong>
-        </div>
-        <div className="stat-tile">
-          <span>Current path</span>
-          <strong>{filePath === "." ? "/" : filePath}</strong>
         </div>
       </div>
 
@@ -436,6 +446,8 @@ export default function AgentPage() {
             <div className="file-list">
               {loadingFiles ? (
                 <div className="file-empty">Loading...</div>
+              ) : filesError ? (
+                <div className="file-empty">{filesError}</div>
               ) : entries.length === 0 ? (
                 <div className="file-empty">Empty directory</div>
               ) : (
