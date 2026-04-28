@@ -99,5 +99,21 @@ else
   fi
 fi
 
+echo "=== [6/6] Sudoers configuration ==="
+SUDOERS_TMP=$(mktemp)
+cp "${SCRIPT_DIR}/../sudoers/app-provisioner" "${SUDOERS_TMP}"
+sed -i "s/__APPUSER__/$SUDO_USER/g; s|__PROJECT__|$(cd "${SCRIPT_DIR}/../.." && pwd)|g" \
+  "${SUDOERS_TMP}"
+if visudo -c -f "${SUDOERS_TMP}" >/dev/null 2>&1; then
+  mv "${SUDOERS_TMP}" /etc/sudoers.d/clawaas-app-provisioner
+  chmod 440 /etc/sudoers.d/clawaas-app-provisioner
+  echo "Sudoers policy installed and validated."
+else
+  echo "ERROR: sudoers syntax check failed — not installing." >&2
+  visudo -c -f "${SUDOERS_TMP}"
+  rm -f "${SUDOERS_TMP}"
+  exit 1
+fi
+
 echo ""
 echo "=== Installation complete. Run verify_host.sh to confirm. ==="

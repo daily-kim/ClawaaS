@@ -251,7 +251,7 @@ export default function AgentPage() {
       try {
         const token = getToken();
         const res = await fetch(
-          `http://${window.location.hostname}:8000/agents/${id}/logs?since=30m`,
+          `/api/agents/${id}/logs?since=30m`,
           {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
             signal: controller.signal,
@@ -402,7 +402,7 @@ export default function AgentPage() {
     try {
       const token = getToken();
       const res = await fetch(
-        `http://${window.location.hostname}:8000/agents/${id}/chat/stream`,
+        `/api/agents/${id}/chat/stream`,
         {
           method: "POST",
           headers: {
