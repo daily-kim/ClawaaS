@@ -20,9 +20,26 @@ npm run build      # 프로덕션 빌드
 npm run start      # 프로덕션 서버
 ```
 
+## 환경변수 설정
+
+```bash
+cp .env.example .env.local
+# 필요 값 수정
+```
+
+| 변수 | 설명 | 기본값 |
+|------|------|--------|
+| `CLAWAAS_API_BASE_URL` | Next.js가 `/api/*`를 프록시할 백엔드 주소 | `http://127.0.0.1:8000` |
+| `CLAWAAS_CORS_ALLOWED_ORIGINS` | 허용 Origin 목록(쉼표 구분). 웹에서는 `allowedDevOrigins`에 사용 | 빈 값 |
+
 ## API 프록시
 
-`next.config.js`에서 `/api/*` 요청을 `http://127.0.0.1:8000`으로 프록시합니다. 백엔드 서버가 8000번 포트에서 실행 중이어야 합니다.
+`next.config.js`에서 `/api/*` 요청을 `CLAWAAS_API_BASE_URL`(기본값: `http://127.0.0.1:8000`)로 프록시합니다.
+
+원격 IP로 개발 서버에 접속하는 경우 `CLAWAAS_CORS_ALLOWED_ORIGINS`(쉼표 구분)에 해당 Origin을 추가해야 HMR/폰트 등의 dev 리소스 차단이 발생하지 않습니다.
+
+> 참고: Next.js의 `allowedDevOrigins` 자체는 개발 서버 보호를 위한 옵션입니다.
+> 변수명은 운영/개발 공통 정책명을 맞추기 위해 `CLAWAAS_CORS_ALLOWED_ORIGINS`로 통일했습니다.
 
 ## 주요 기능
 
